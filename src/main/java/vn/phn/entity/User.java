@@ -35,8 +35,21 @@ public class User {
     @Column(name = "team", length = 50)
     private String team;
 
+    /** Quyền chấm công: được xem bảng chấm công và chấm công cho người khác. Admin luôn có quyền. */
+    @Column(name = "can_manage_attendance")
+    private Boolean canManageAttendance;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    /** Getter/setter tường minh để build Docker (Lombok có thể không chạy đủ trong môi trường build). */
+    public Boolean getCanManageAttendance() {
+        return canManageAttendance;
+    }
+
+    public void setCanManageAttendance(Boolean canManageAttendance) {
+        this.canManageAttendance = canManageAttendance;
+    }
 
     @PrePersist
     protected void onCreate() {
