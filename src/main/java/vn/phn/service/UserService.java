@@ -24,17 +24,39 @@ public class UserService {
     }
 
     /**
-     * Danh sách nhân sự theo quyền: ADMIN = tất cả; LEADER = cùng nhóm (team); STAFF = chỉ bản thân.
+     * Danh sách nhân sự theo quyền (không loại admin). Gọi khi không dùng personnelOnly.
      */
     public List<UserDto> findUsersForCurrentUser(Long currentUserId) {
+        return findUsersForCurrentUser(currentUserId, false);
+    }
+
+    /** Danh sách tất cả user trừ ADMIN (dùng cho màn Nhân sự). */
+    public List<UserDto> findAllExceptAdmin() {
+        return userRepository.findAll().stream()
+                .filter(u -> u.getRole() != Role.ADMIN)
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Danh sách nhân sự theo quyền: ADMIN = tất cả; LEADER = cùng nhóm (team); STAFF = chỉ bản thân.
+     * @param excludeAdmin nếu true thì loại ADMIN khỏi danh sách (dùng cho màn Nhân sự).
+     */
+    public List<UserDto> findUsersForCurrentUser(Long currentUserId, boolean excludeAdmin) {
         User current = userRepository.findById(currentUserId).orElse(null);
         if (current == null) return List.of();
-        if (current.getRole() == Role.ADMIN) return findAll();
-        if (current.getRole() == Role.LEADER && current.getTeam() != null && !current.getTeam().isBlank()) {
-            return userRepository.findByTeam(current.getTeam()).stream().map(this::toDto).collect(Collectors.toList());
+        List<UserDto> list;
+        if (current.getRole() == Role.ADMIN) {
+            list = excludeAdmin ? findAllExceptAdmin() : findAll();
+        } else if (current.getRole() == Role.LEADER && current.getTeam() != null && !current.getTeam().isBlank()) {
+            list = userRepository.findByTeam(current.getTeam()).stream().map(this::toDto).collect(Collectors.toList());
+        } else {
+            list = List.of(toDto(current));
         }
-        if (current.getRole() == Role.STAFF) return List.of(toDto(current));
-        return List.of(toDto(current));
+        if (excludeAdmin) {
+            list = list.stream().filter(dto -> dto.getRole() != Role.ADMIN).collect(Collectors.toList());
+        }
+        return list;
     }
 
     public List<UserDto> findByRole(Role role) {
@@ -75,6 +97,8 @@ public class UserService {
                 .password(req.getPassword()) // TODO: mã hóa password (BCrypt) nếu cần
                 .name(req.getName())
                 .role(req.getRole())
+                .team(req.getTeam() != null && !req.getTeam().isBlank() ? req.getTeam().trim() : null)
+                .canManageAttendance(Boolean.TRUE.equals(req.getCanManageAttendance()))
                 .build();
         user = userRepository.save(user);
         return toDto(user);
@@ -112,6 +136,60 @@ public class UserService {
         return toDto(target);
     }
 
+    /**
+     * Admin cập nhật nhóm (team) cho user.
+     */
+    @Transactional
+    public UserDto updateTeamByAdmin(Long targetUserId, String team, Long adminId) {
+        User admin = userRepository.findById(adminId).orElse(null);
+        if (admin == null || admin.getRole() != Role.ADMIN) return null;
+        User target = userRepository.findById(targetUserId).orElse(null);
+        if (target == null) return null;
+        target.setTeam(team != null && !team.isBlank() ? team.trim() : null);
+        target = userRepository.save(target);
+        return toDto(target);
+    }
+
+    /**
+     * Admin cập nhật quyền chấm công cho user.
+     */
+    @Transactional
+    public UserDto updateAttendancePermissionByAdmin(Long targetUserId, boolean allowed, Long adminId) {
+        User admin = userRepository.findById(adminId).orElse(null);
+        if (admin == null || admin.getRole() != Role.ADMIN) return null;
+        User target = userRepository.findById(targetUserId).orElse(null);
+        if (target == null) return null;
+        target.setCanManageAttendance(allowed);
+        target = userRepository.save(target);
+        return toDto(target);
+    }
+
+    /**
+     * Admin xóa nhân viên (không xóa được ADMIN). Trả về true nếu xóa thành công.
+     * Có thể thất bại do ràng buộc khóa ngoại (user có tasks, reports, ...).
+     */
+    @Transactional
+    public boolean deleteByAdmin(Long targetUserId, Long adminId) {
+        User admin = userRepository.findById(adminId).orElse(null);
+        if (admin == null || admin.getRole() != Role.ADMIN) return false;
+        User target = userRepository.findById(targetUserId).orElse(null);
+        if (target == null) return false;
+        if (target.getRole() == Role.ADMIN) return false; // Không cho xóa admin
+        try {
+            userRepository.delete(target);
+            return true;
+        } catch (Exception e) {
+            return false; // Ràng buộc FK hoặc lỗi khác
+        }
+    }
+
+    /** Admin có quyền chấm công không (luôn true). User khác theo trường canManageAttendance. */
+    public boolean canManageAttendance(Long userId) {
+        return userRepository.findById(userId)
+                .map(u -> u.getRole() == Role.ADMIN || Boolean.TRUE.equals(u.getCanManageAttendance()))
+                .orElse(false);
+    }
+
     public UserDto toDto(User u) {
         if (u == null) return null;
         return UserDto.builder()
@@ -120,6 +198,7 @@ public class UserService {
                 .name(u.getName())
                 .role(u.getRole())
                 .team(u.getTeam())
+                .canManageAttendance(u.getRole() == Role.ADMIN || Boolean.TRUE.equals(u.getCanManageAttendance()))
                 .build();
     }
 }

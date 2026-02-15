@@ -23,11 +23,14 @@ public class UserController {
     /**
      * GET /api/users → tất cả (admin).
      * GET /api/users?currentUserId=2 → theo quyền: admin = tất cả, leader = cùng nhóm, staff = chỉ mình.
+     * GET /api/users?currentUserId=1&personnelOnly=true → danh sách nhân sự (loại ADMIN, dùng cho màn Nhân sự).
      */
     @GetMapping
-    public ResponseEntity<List<UserDto>> findAll(@RequestParam(required = false) Long currentUserId) {
+    public ResponseEntity<List<UserDto>> findAll(
+            @RequestParam(required = false) Long currentUserId,
+            @RequestParam(required = false, defaultValue = "false") boolean personnelOnly) {
         if (currentUserId != null) {
-            return ResponseEntity.ok(userService.findUsersForCurrentUser(currentUserId));
+            return ResponseEntity.ok(userService.findUsersForCurrentUser(currentUserId, personnelOnly));
         }
         return ResponseEntity.ok(userService.findAll());
     }
@@ -82,5 +85,39 @@ public class UserController {
             @RequestParam Long adminId) {
         UserDto updated = userService.updateRoleByAdmin(id, role, adminId);
         return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.badRequest().build();
+    }
+
+    /**
+     * Admin cập nhật nhóm cho user. PATCH /api/users/{id}/team?adminId=1&team=old_product
+     */
+    @PatchMapping("/{id}/team")
+    public ResponseEntity<UserDto> updateTeam(
+            @PathVariable Long id,
+            @RequestParam Long adminId,
+            @RequestParam(required = false) String team) {
+        UserDto updated = userService.updateTeamByAdmin(id, team, adminId);
+        return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.badRequest().build();
+    }
+
+    /**
+     * Admin bật/tắt quyền chấm công cho user.
+     * PATCH /api/users/{id}/attendance-permission?adminId=1&allowed=true
+     */
+    @PatchMapping("/{id}/attendance-permission")
+    public ResponseEntity<UserDto> updateAttendancePermission(
+            @PathVariable Long id,
+            @RequestParam Long adminId,
+            @RequestParam boolean allowed) {
+        UserDto updated = userService.updateAttendancePermissionByAdmin(id, allowed, adminId);
+        return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.badRequest().build();
+    }
+
+    /**
+     * Admin xóa nhân viên (không xóa được ADMIN). DELETE /api/users/{id}?adminId=1
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id, @RequestParam Long adminId) {
+        boolean deleted = userService.deleteByAdmin(id, adminId);
+        return deleted ? ResponseEntity.ok().build() : ResponseEntity.badRequest().build();
     }
 }

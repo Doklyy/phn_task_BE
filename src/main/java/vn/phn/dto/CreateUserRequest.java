@@ -27,5 +27,11 @@ public class CreateUserRequest {
 
     @NotNull(message = "Role không được để trống")
     private Role role;
+
+    /** Nhóm: old_product, new_product hoặc tên nhóm khác (tùy chọn). */
+    private String team;
+
+    /** Cấp quyền chấm công cho user mới (mặc định false). */
+    private Boolean canManageAttendance;
 }
 
