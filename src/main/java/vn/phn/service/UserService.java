@@ -192,13 +192,13 @@ public class UserService {
 
     public UserDto toDto(User u) {
         if (u == null) return null;
-        return UserDto.builder()
-                .id(u.getId())
-                .username(u.getUsername())
-                .name(u.getName())
-                .role(u.getRole())
-                .team(u.getTeam())
-                .canManageAttendance(u.getRole() == Role.ADMIN || Boolean.TRUE.equals(u.getCanManageAttendance()))
-                .build();
+        UserDto dto = new UserDto();
+        dto.setId(u.getId());
+        dto.setUsername(u.getUsername());
+        dto.setName(u.getName());
+        dto.setRole(u.getRole());
+        dto.setTeam(u.getTeam());
+        dto.setCanManageAttendance(u.getRole() == Role.ADMIN || Boolean.TRUE.equals(u.getCanManageAttendance()));
+        return dto;
     }
 }
