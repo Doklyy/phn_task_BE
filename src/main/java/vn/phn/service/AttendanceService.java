@@ -178,14 +178,15 @@ public class AttendanceService {
     }
 
     /**
-     * Lấy bản ghi chấm công tháng hiện tại (user hoặc admin xem tất cả).
+     * Lấy bản ghi chấm công tháng. Được xem nếu: là chính mình, hoặc ADMIN, hoặc có quyền chấm công (canManageAttendance).
      */
-    public List<AttendanceRecordDto> getRecordsForMonth(Long currentUserId, Role role, int year, int month, Long targetUserId) {
+    public List<AttendanceRecordDto> getRecordsForMonth(Long currentUserId, Role role, boolean canManageAttendance, int year, int month, Long targetUserId) {
         LocalDate start = LocalDate.of(year, month, 1);
         LocalDate end = start.with(TemporalAdjusters.lastDayOfMonth());
 
         Long uid = targetUserId != null ? targetUserId : currentUserId;
-        if (role != Role.ADMIN && !uid.equals(currentUserId)) return List.of();
+        boolean allowed = uid.equals(currentUserId) || role == Role.ADMIN || canManageAttendance;
+        if (!allowed) return List.of();
 
         return getRecords(uid, start, end);
     }

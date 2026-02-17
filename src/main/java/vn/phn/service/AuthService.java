@@ -50,6 +50,8 @@ public class AuthService {
     }
 
     private LoginResponse toLoginResponse(User user) {
+        boolean canManage = user.getRole() == vn.phn.entity.Role.ADMIN
+                || Boolean.TRUE.equals(user.getCanManageAttendance());
         return LoginResponse.builder()
                 .userId(user.getId())
                 .username(user.getUsername())
@@ -57,6 +59,7 @@ public class AuthService {
                 .role(user.getRole())
                 .team(user.getTeam())
                 .token(String.valueOf(user.getId()))
+                .canManageAttendance(canManage)
                 .build();
     }
 }

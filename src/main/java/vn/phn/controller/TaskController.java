@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vn.phn.dto.TaskDto;
 import vn.phn.dto.CreateTaskRequest;
+import vn.phn.dto.UpdateTaskRequest;
 import vn.phn.dto.CompletionReportRequest;
 import vn.phn.entity.Role;
 import vn.phn.entity.User;
@@ -120,16 +121,22 @@ public class TaskController {
         return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.badRequest().build();
     }
 
-    /** Cập nhật task (trạng thái, chất lượng) - Leader/Admin */
+    /** Cập nhật task (trạng thái, chất lượng) - Leader/Admin. Query params. */
     @PatchMapping("/{taskId}")
     public ResponseEntity<TaskDto> updateTask(
             @PathVariable Long taskId,
             @RequestParam Long userId,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) Double quality) {
+            @RequestParam(required = false) Double quality,
+            @RequestBody(required = false) UpdateTaskRequest body) {
         User user = userService.getEntity(userId);
         if (user == null || (user.getRole() != Role.ADMIN && user.getRole() != Role.LEADER))
             return ResponseEntity.status(403).build();
+        if (body != null && (body.getTitle() != null || body.getContent() != null || body.getObjective() != null
+                || body.getDeadline() != null || body.getWeight() != null || body.getStatus() != null || body.getQuality() != null)) {
+            TaskDto updated = taskService.updateTaskDetails(taskId, body, userId, user.getRole());
+            return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.badRequest().build();
+        }
         vn.phn.entity.TaskStatus s = status != null ? vn.phn.entity.TaskStatus.valueOf(status) : null;
         TaskDto updated = taskService.updateTask(taskId, s, quality, userId, user.getRole());
         return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.badRequest().build();

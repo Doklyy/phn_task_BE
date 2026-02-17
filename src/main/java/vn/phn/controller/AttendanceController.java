@@ -51,14 +51,18 @@ public class AttendanceController {
     }
 
     /**
-     * GET /api/attendance/records?userId=...&from=...&to=...
-     * Lấy bản ghi chấm công trong khoảng ngày.
+     * GET /api/attendance/records?currentUserId=...&userId=...&from=...&to=...
+     * Lấy bản ghi chấm công. Chỉ được xem bản ghi của người khác nếu currentUser là ADMIN hoặc có quyền chấm công.
      */
     @GetMapping("/records")
     public ResponseEntity<List<AttendanceRecordDto>> getRecords(
+            @RequestParam Long currentUserId,
             @RequestParam Long userId,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
+        if (!userId.equals(currentUserId) && !userService.canManageAttendance(currentUserId)) {
+            return ResponseEntity.status(403).build();
+        }
         LocalDate fromDate = from != null ? LocalDate.parse(from) : LocalDate.now().withDayOfMonth(1);
         LocalDate toDate = to != null ? LocalDate.parse(to) : LocalDate.now();
         List<AttendanceRecordDto> list = attendanceService.getRecords(userId, fromDate, toDate);
@@ -66,8 +70,8 @@ public class AttendanceController {
     }
 
     /**
-     * GET /api/attendance/records/month?userId=...&year=...&month=...&currentUserId=...
-     * Lấy bản ghi chấm công theo tháng. Admin có thể truyền target userId.
+     * GET /api/attendance/records/month?currentUserId=...&year=...&month=...&targetUserId=...
+     * Lấy bản ghi chấm công theo tháng. Admin hoặc người có quyền chấm công có thể truyền targetUserId.
      */
     @GetMapping("/records/month")
     public ResponseEntity<List<AttendanceRecordDto>> getRecordsForMonth(
@@ -76,7 +80,8 @@ public class AttendanceController {
             @RequestParam int month,
             @RequestParam(required = false) Long targetUserId) {
         Role role = userService.getRole(currentUserId);
-        List<AttendanceRecordDto> list = attendanceService.getRecordsForMonth(currentUserId, role, year, month, targetUserId);
+        boolean canManage = userService.canManageAttendance(currentUserId);
+        List<AttendanceRecordDto> list = attendanceService.getRecordsForMonth(currentUserId, role, canManage, year, month, targetUserId);
         return ResponseEntity.ok(list);
     }
 

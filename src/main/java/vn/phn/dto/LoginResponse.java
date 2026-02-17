@@ -16,4 +16,6 @@ public class LoginResponse {
     private String token; // Có thể dùng JWT sau này, hiện tại trả userId để FE dùng
     /** Nhóm: old_product | new_product | null */
     private String team;
+    /** Có quyền chấm công: true = hiển thị nút Chấm công. Admin luôn true. */
+    private Boolean canManageAttendance;
 }

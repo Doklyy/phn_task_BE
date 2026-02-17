@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.phn.dto.TaskDto;
 import vn.phn.dto.CreateTaskRequest;
+import vn.phn.dto.UpdateTaskRequest;
 import vn.phn.entity.Role;
 import vn.phn.entity.Task;
 import vn.phn.entity.TaskStatus;
@@ -182,6 +183,42 @@ public class TaskService {
             if (status == TaskStatus.COMPLETED)
                 task.setCompletedAt(LocalDateTime.now());
         }
+        task = taskRepository.save(task);
+        return toDto(task, userRepository.findById(currentUserId).orElse(null));
+    }
+
+    /**
+     * Admin/Leader chỉnh sửa thông tin công việc: nội dung, thời hạn, trọng số, trạng thái, chất lượng.
+     * Admin: sửa mọi task. Leader: chỉ sửa task mà mình là leader (leaderId = currentUserId).
+     */
+    @Transactional
+    public TaskDto updateTaskDetails(Long taskId, UpdateTaskRequest req, Long currentUserId, Role role) {
+        if (req == null) return null;
+        Task task = taskRepository.findById(taskId).orElse(null);
+        if (task == null) return null;
+        if (role != Role.ADMIN && role != Role.LEADER) return null;
+        if (role == Role.LEADER && !Objects.equals(task.getLeaderId(), currentUserId))
+            return null;
+
+        if (req.getTitle() != null && !req.getTitle().isBlank())
+            task.setTitle(req.getTitle().trim());
+        if (req.getContent() != null)
+            task.setContent(req.getContent().isBlank() ? null : req.getContent().trim());
+        if (req.getObjective() != null)
+            task.setObjective(req.getObjective().isBlank() ? null : req.getObjective().trim());
+        if (req.getDeadline() != null)
+            task.setDeadline(req.getDeadline());
+        if (req.getWeight() != null)
+            task.setWeight(req.getWeight());
+        if (req.getQuality() != null)
+            task.setQuality(req.getQuality());
+        if (req.getStatus() != null && !req.getStatus().isBlank()) {
+            TaskStatus s = TaskStatus.valueOf(req.getStatus().toUpperCase().trim());
+            task.setStatus(s);
+            if (s == TaskStatus.COMPLETED)
+                task.setCompletedAt(LocalDateTime.now());
+        }
+
         task = taskRepository.save(task);
         return toDto(task, userRepository.findById(currentUserId).orElse(null));
     }
