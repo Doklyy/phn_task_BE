@@ -1,6 +1,10 @@
 package vn.phn.controller;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -57,6 +61,39 @@ public class UploadController {
             Map<String, String> err = new HashMap<>();
             err.put("message", "Tải file lên thất bại: " + (e.getMessage() != null ? e.getMessage() : "lỗi hệ thống"));
             return ResponseEntity.status(500).body(err);
+        }
+    }
+
+    /**
+     * Tải file đính kèm (Admin/Leader xem file nhân viên đã gửi).
+     * GET /api/upload/files/{path} với path = "uploads/xxx.ext" (đúng như trả về từ POST /upload).
+     */
+    @GetMapping("/upload/files/{*path}")
+    public ResponseEntity<Resource> getFile(@PathVariable("path") String pathSegment) {
+        if (pathSegment == null || pathSegment.isBlank()) {
+            return ResponseEntity.notFound().build();
+        }
+        String path = pathSegment.startsWith("/") ? pathSegment.substring(1) : pathSegment;
+        if (path.contains("..")) {
+            return ResponseEntity.notFound().build();
+        }
+        try {
+            Path base = Paths.get(uploadDir).toAbsolutePath().normalize();
+            Path file = base.getParent().resolve(path).normalize();
+            if (!file.startsWith(base)) {
+                return ResponseEntity.notFound().build();
+            }
+            if (!Files.isRegularFile(file)) {
+                return ResponseEntity.notFound().build();
+            }
+            Resource resource = new InputStreamResource(Files.newInputStream(file));
+            String name = file.getFileName().toString();
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + name + "\"")
+                    .body(resource);
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
         }
     }
 }
