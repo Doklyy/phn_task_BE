@@ -3,22 +3,9 @@ package vn.phn.entity;
 import lombok.Getter;
 
 /**
- * Mã chuyên cần và điểm tương ứng (theo bảng thời gian làm việc).
- * L (Làm cả ngày): 8
- * N_FULL (Nghỉ cả ngày được duyệt): 0
- * N_HALF (Nghỉ nửa ngày): 4
- * N_LATE (Xin đến muộn): 5
- * N_EARLY (Xin về sớm): 5
- * M (Đến muộn bị nhắc nhở): -8
- * V (Vắng chưa được đồng ý): -8
- * L_HOLIDAY (Nghỉ lễ): 0
- * T_HOLIDAY (Trực lễ): 8
- * CN (Nghỉ chủ nhật): 0
- * T7 (Nghỉ thứ 7): 0
- * TT7 (Trực thứ 7 theo vòng): 0
- * TCN (Trực CN theo yêu cầu C/v): 8
- *
- * Quy tắc: Nghỉ, Vắng, Đến muộn ngày đầu tuần (Thứ 2) trừ thêm 2 điểm.
+ * Mã chuyên cần và điểm (theo bảng quy định).
+ * L=8, N_FULL(N)=0, N_HALF(N4)=4, N_LATE(N1)=5, N_EARLY(N2)=5,
+ * M=-8, V=-8, L_HOLIDAY(L)=0, T_HOLIDAY(T)=8, CN=0, T7=0, TT7=0, TCN=8.
  */
 @Getter
 public enum AttendanceCode {

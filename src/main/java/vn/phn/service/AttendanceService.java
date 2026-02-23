@@ -68,14 +68,9 @@ public class AttendanceService {
                 existing.setCheckInAt(now);
                 existing.setIsLate(isLate);
                 if (now.isAfter(LATE_THRESHOLD)) {
-                    // Có đơn xin muộn đã được duyệt → N_LATE; ngược lại → M (đến muộn bị nhắc nhở)
                     AttendanceCode code = hasLatePermission ? AttendanceCode.N_LATE : AttendanceCode.M;
-                    int points = code.getPoints();
-                    if (dow == DayOfWeek.MONDAY) {
-                        points -= 2; // Thứ 2 đến muộn trừ thêm 2 điểm
-                    }
                     existing.setAttendanceCode(code);
-                    existing.setPoints(points);
+                    existing.setPoints(code.getPoints());
                 }
                 existing = attendanceRepository.save(existing);
             }
@@ -89,9 +84,6 @@ public class AttendanceService {
         if (now.isAfter(LATE_THRESHOLD)) {
             code = hasLatePermission ? AttendanceCode.N_LATE : AttendanceCode.M;
             points = code.getPoints();
-            if (dow == DayOfWeek.MONDAY) {
-                points -= 2; // Thứ 2 đến muộn trừ thêm 2
-            }
         } else {
             code = AttendanceCode.L;
             points = code.getPoints();
@@ -156,13 +148,9 @@ public class AttendanceService {
         record.setIsEarlyLeave(isEarly);
 
         if (isEarly) {
-            AttendanceCode code = AttendanceCode.N_EARLY; // Xin về sớm (mặc định, admin có thể điều chỉnh sau)
-            int points = code.getPoints();
-            if (dow == DayOfWeek.MONDAY) {
-                points -= 2; // Thứ 2 về sớm trừ thêm 2 điểm
-            }
+            AttendanceCode code = AttendanceCode.N_EARLY;
             record.setAttendanceCode(code);
-            record.setPoints(points);
+            record.setPoints(code.getPoints());
         }
 
         record = attendanceRepository.save(record);
@@ -272,6 +260,53 @@ public class AttendanceService {
                 })
                 .distinct()
                 .count();
+    }
+
+    /**
+     * Cập nhật bản ghi chấm công (giờ vào, giờ ra, trạng thái). Chỉ người có quyền chấm công.
+     */
+    @Transactional
+    public AttendanceRecordDto updateRecord(Long recordId, Long currentUserId,
+            java.time.LocalTime checkInAt, java.time.LocalTime checkOutAt, AttendanceCode attendanceCode) {
+        if (!userRepository.findById(currentUserId).map(u -> u.getRole() == Role.ADMIN || Boolean.TRUE.equals(u.getCanManageAttendance())).orElse(false)) {
+            return null;
+        }
+        AttendanceRecord r = attendanceRepository.findById(recordId).orElse(null);
+        if (r == null) return null;
+
+        if (checkInAt != null) r.setCheckInAt(checkInAt);
+        if (checkOutAt != null) r.setCheckOutAt(checkOutAt);
+        if (attendanceCode != null) {
+            r.setAttendanceCode(attendanceCode);
+            r.setPoints(attendanceCode.getPoints());
+        }
+        r = attendanceRepository.save(r);
+        return toDto(r);
+    }
+
+    /**
+     * Tạo bản ghi chấm công (chỉ người có quyền chấm công). Nếu đã có bản ghi cùng user + ngày thì không tạo.
+     */
+    @Transactional
+    public AttendanceRecordDto createRecord(Long currentUserId, Long userId, LocalDate recordDate,
+            LocalTime checkInAt, LocalTime checkOutAt, AttendanceCode attendanceCode) {
+        if (!userRepository.findById(currentUserId).map(u -> u.getRole() == Role.ADMIN || Boolean.TRUE.equals(u.getCanManageAttendance())).orElse(false)) {
+            return null;
+        }
+        if (attendanceRepository.findByUserIdAndRecordDate(userId, recordDate).isPresent()) {
+            return null; // đã có bản ghi
+        }
+        if (attendanceCode == null) attendanceCode = AttendanceCode.L;
+        AttendanceRecord r = AttendanceRecord.builder()
+                .userId(userId)
+                .recordDate(recordDate)
+                .attendanceCode(attendanceCode)
+                .points(attendanceCode.getPoints())
+                .checkInAt(checkInAt)
+                .checkOutAt(checkOutAt)
+                .build();
+        r = attendanceRepository.save(r);
+        return toDto(r);
     }
 
     public AttendanceRecordDto toDto(AttendanceRecord r) {

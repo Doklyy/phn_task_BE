@@ -23,13 +23,17 @@ public class UserController {
     /**
      * GET /api/users → tất cả (admin).
      * GET /api/users?currentUserId=2 → theo quyền: admin = tất cả, leader = cùng nhóm, staff = chỉ mình.
-     * GET /api/users?currentUserId=1&personnelOnly=true → danh sách nhân sự (loại ADMIN, dùng cho màn Nhân sự).
+     * GET /api/users?currentUserId=1&personnelOnly=true → danh sách nhân sự (loại ADMIN).
+     * Nếu currentUserId có quyền chấm công (canManageAttendance) và personnelOnly=true → trả về tất cả nhân sự (để chấm công cho mọi người).
      */
     @GetMapping
     public ResponseEntity<List<UserDto>> findAll(
             @RequestParam(required = false) Long currentUserId,
             @RequestParam(required = false, defaultValue = "false") boolean personnelOnly) {
         if (currentUserId != null) {
+            if (personnelOnly && userService.canManageAttendance(currentUserId)) {
+                return ResponseEntity.ok(userService.findAllExceptAdmin());
+            }
             return ResponseEntity.ok(userService.findUsersForCurrentUser(currentUserId, personnelOnly));
         }
         return ResponseEntity.ok(userService.findAll());
