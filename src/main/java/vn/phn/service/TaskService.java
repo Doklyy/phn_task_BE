@@ -18,6 +18,7 @@ import java.util.Objects;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -66,6 +67,33 @@ public class TaskService {
         });
 
         return tasks.stream().map(t -> toDto(t, currentUser)).collect(Collectors.toList());
+    }
+
+    /**
+     * Thống kê Phân bổ nhiệm vụ cho dashboard: Quá hạn, Đang thực hiện, Hoàn thành (và Đợi duyệt).
+     * Cùng phạm vi task với getTasksForUser (Admin: tất cả, Leader: task mình quản lý, Staff: task được giao).
+     * Quá hạn = ACCEPTED + deadline &lt; now (không tính PENDING_APPROVAL).
+     */
+    public Map<String, Integer> getDashboardStats(Long currentUserId, Role role) {
+        User currentUser = userRepository.findById(currentUserId).orElse(null);
+        if (currentUser == null) return Map.of("overdue", 0, "inProgress", 0, "completed", 0, "pendingApproval", 0, "new", 0, "total", 0);
+
+        List<Task> tasks;
+        if (role == Role.ADMIN) {
+            tasks = taskRepository.findAll();
+        } else if (role == Role.LEADER) {
+            tasks = taskRepository.findByLeaderIdOrAssigneeIdOrderByDeadlineAsc(currentUserId, currentUserId);
+        } else {
+            tasks = taskRepository.findByAssigneeIdOrderByDeadlineAsc(currentUserId);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        int newCount = (int) tasks.stream().filter(t -> t.getStatus() == TaskStatus.NEW).count();
+        int overdue = (int) tasks.stream().filter(t -> t.getStatus() == TaskStatus.ACCEPTED && t.getDeadline().isBefore(now)).count();
+        int inProgress = (int) tasks.stream().filter(t -> t.getStatus() == TaskStatus.ACCEPTED && !t.getDeadline().isBefore(now)).count();
+        int completed = (int) tasks.stream().filter(t -> t.getStatus() == TaskStatus.COMPLETED).count();
+        int pendingApproval = (int) tasks.stream().filter(t -> t.getStatus() == TaskStatus.PENDING_APPROVAL).count();
+        return Map.of("overdue", overdue, "inProgress", inProgress, "completed", completed, "pendingApproval", pendingApproval, "new", newCount, "total", tasks.size());
     }
 
     /**

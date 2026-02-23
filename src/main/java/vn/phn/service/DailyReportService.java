@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.phn.dto.DailyReportDto;
 import vn.phn.dto.ReportComplianceDto;
+import vn.phn.dto.ReportReminderDto;
 import vn.phn.dto.SubmitReportRequest;
 import vn.phn.entity.DailyReport;
 import vn.phn.entity.Task;
@@ -54,6 +55,62 @@ public class DailyReportService {
     public List<DailyReportDto> getReportsByUser(Long userId) {
         return reportRepository.findByUserIdOrderByReportDateDesc(userId)
                 .stream().map(this::toDto).collect(Collectors.toList());
+    }
+
+    /**
+     * Lịch sử báo cáo theo nhiệm vụ (từng ngày) – dùng khi xem chi tiết nhiệm vụ.
+     * Sắp xếp theo reportDate tăng dần (ngày 1, ngày 2, ngày 3...).
+     */
+    public List<DailyReportDto> getReportsByTaskId(Long taskId) {
+        return reportRepository.findByTaskIdOrderByReportDateDesc(taskId).stream()
+                .map(this::toDto)
+                .sorted((a, b) -> a.getReportDate().compareTo(b.getReportDate()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Kiểm tra nhắc báo cáo: nếu ngày hôm trước user có công việc (assignee, đang thực hiện) mà chưa báo cáo thì cần nhắc bù.
+     */
+    public ReportReminderDto getReportReminder(Long userId) {
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+        ZoneId zone = ZoneId.systemDefault();
+
+        List<Task> assigneeTasks = taskRepository.findByAssigneeIdOrderByDeadlineAsc(userId).stream()
+                .filter(t -> t.getStatus() == TaskStatus.ACCEPTED || t.getStatus() == TaskStatus.NEW)
+                .collect(Collectors.toList());
+
+        boolean hadWorkYesterday = assigneeTasks.stream().anyMatch(t -> {
+            LocalDate taskCreated = t.getCreatedAt() != null ? t.getCreatedAt().atZone(zone).toLocalDate() : null;
+            if (taskCreated == null || taskCreated.isAfter(yesterday)) return false;
+            if (t.getCompletedAt() == null) return true;
+            return t.getCompletedAt().toLocalDate().isAfter(yesterday);
+        });
+
+        if (!hadWorkYesterday) {
+            return ReportReminderDto.builder()
+                    .missingYesterday(false)
+                    .yesterday(yesterday)
+                    .message(null)
+                    .build();
+        }
+
+        boolean reportedYesterday = reportRepository.findByUserIdOrderByReportDateDesc(userId).stream()
+                .anyMatch(r -> r.getReportDate().equals(yesterday));
+
+        if (reportedYesterday) {
+            return ReportReminderDto.builder()
+                    .missingYesterday(false)
+                    .yesterday(yesterday)
+                    .message(null)
+                    .build();
+        }
+
+        return ReportReminderDto.builder()
+                .missingYesterday(true)
+                .yesterday(yesterday)
+                .message("Bạn chưa báo cáo công việc ngày " + yesterday + ". Vui lòng báo cáo bù ngay.")
+                .build();
     }
 
     /**
