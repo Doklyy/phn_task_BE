@@ -75,12 +75,33 @@ public class UploadController {
         if (pathParam == null || pathParam.isBlank()) {
             return ResponseEntity.badRequest().build();
         }
-        String path;
         try {
-            path = URLDecoder.decode(pathParam, StandardCharsets.UTF_8);
+            String path = URLDecoder.decode(pathParam, StandardCharsets.UTF_8);
+            return serveFile(path);
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
         }
+    }
+
+    /**
+     * Tải file – URL cũ (FE có thể vẫn gọi /api/upload/files/uploads%2Fxxx.xlsx).
+     * Hỗ trợ cả hai dạng để link luôn tải được.
+     */
+    @GetMapping("/upload/files/{*pathSegment}")
+    public ResponseEntity<Resource> getFileLegacy(@PathVariable("pathSegment") String pathSegment) {
+        if (pathSegment == null || pathSegment.isBlank()) {
+            return ResponseEntity.notFound().build();
+        }
+        try {
+            String path = URLDecoder.decode(pathSegment, StandardCharsets.UTF_8);
+            path = path.startsWith("/") ? path.substring(1) : path;
+            return serveFile(path);
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    private ResponseEntity<Resource> serveFile(String path) {
         path = path.replace('\\', '/').trim();
         if (path.contains("..")) {
             return ResponseEntity.notFound().build();

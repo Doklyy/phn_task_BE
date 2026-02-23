@@ -60,6 +60,17 @@ public class TaskController {
         return ResponseEntity.ok(tasks);
     }
 
+    /**
+     * Thống kê Phân bổ nhiệm vụ cho dashboard: overdue, inProgress, completed, pendingApproval, total.
+     * FE dùng để hiển thị % Quá hạn / Đang thực hiện / Hoàn thành.
+     */
+    @GetMapping("/dashboard-stats")
+    public ResponseEntity<Map<String, Integer>> getDashboardStats(@RequestParam Long userId) {
+        User user = userService.getEntity(userId);
+        if (user == null) return ResponseEntity.badRequest().build();
+        return ResponseEntity.ok(taskService.getDashboardStats(userId, user.getRole()));
+    }
+
     /** Tạo task mới (Admin/Leader). Assigner = userId gửi lên. */
     @PostMapping
     public ResponseEntity<TaskDto> createTask(@Valid @RequestBody CreateTaskRequest req, @RequestParam Long assignerId) {

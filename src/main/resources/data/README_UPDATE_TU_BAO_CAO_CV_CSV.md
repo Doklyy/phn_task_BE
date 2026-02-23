@@ -36,10 +36,12 @@ Script sẽ tạo file: `src/main/resources/data/update_dashboard_from_bao_cao_c
 2. Lấy **Connection string** (hoặc host, database, user, password).
 3. Chạy nội dung file `update_dashboard_from_bao_cao_cv.sql`:
 
-   - Trên máy local (nếu đã cài `psql`):
+   - Trên máy local (nếu đã cài `psql`), nên set UTF-8 trước để tiếng Việt không lỗi:
      ```bash
+     set PGCLIENTENCODING=UTF8
      psql "postgresql://user:pass@host/dbname?sslmode=require" -f src/main/resources/data/update_dashboard_from_bao_cao_cv.sql
      ```
+     (Trên Windows CMD: `set PGCLIENTENCODING=UTF8`. Trên PowerShell: `$env:PGCLIENTENCODING='UTF8'`.)
    - Hoặc dùng công cụ SQL (pgAdmin, DBeaver, …) kết nối tới DB Render và paste/chạy từng phần hoặc cả file.
 
 Sau khi chạy xong:

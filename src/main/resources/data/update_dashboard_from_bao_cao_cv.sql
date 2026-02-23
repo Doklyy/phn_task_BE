@@ -113,8 +113,8 @@ WHERE title = 'Tổng kết chương trình tết vẹn toàn, đẩy voucher ch
 
 -- 2) INSERT daily_reports (báo cáo cuối ngày cho dashboard theo dõi)
 -- Chỉ thêm bản ghi có nội dung Kết quả thực hiện; report_date = Ngày hoàn thành hoặc Ngày giao
-INSERT INTO daily_reports (user_id, task_id, report_date, result, weight, submitted_at)
-SELECT u.id, t.id, '2026-01-07'::date, 'Việc xây dựng mạng lưới cần phối hợp cùng với P.HTML để tránh trùng nhau, sơ đồ đường đi cần thu thập thông tin về luồng vận hành hiện có, sau đó tính toán phương án tối ưu phù hợp với việc triển khai XHH, nội dung khi thực hiện sẽ báo cáo xin ý kiến trực tiếp chỉ huy nếu có vướng mắc', 0.8, NOW()
+INSERT INTO daily_reports (user_id, task_id, report_date, result, weight, submitted_at, created_at)
+SELECT u.id, t.id, '2026-01-07'::date, 'Việc xây dựng mạng lưới cần phối hợp cùng với P.HTML để tránh trùng nhau, sơ đồ đường đi cần thu thập thông tin về luồng vận hành hiện có, sau đó tính toán phương án tối ưu phù hợp với việc triển khai XHH, nội dung khi thực hiện sẽ báo cáo xin ý kiến trực tiếp chỉ huy nếu có vướng mắc', 0.8, NOW(), NOW()
 FROM users u
 JOIN tasks t ON t.assignee_id = u.id AND t.title = 'Xây dựng mạng lưới đường đi trục Nam-Bắc, Bắc-Nam theo các hình thức: đường bộ, đường sắt, đường thủy và đường bay'
 WHERE u.name = 'Vũ Văn Đoàn'
@@ -123,9 +123,9 @@ WHERE u.name = 'Vũ Văn Đoàn'
     WHERE dr.user_id = u.id AND dr.task_id = t.id AND dr.report_date = '2026-01-07'::date
   );
 
-INSERT INTO daily_reports (user_id, task_id, report_date, result, weight, submitted_at)
+INSERT INTO daily_reports (user_id, task_id, report_date, result, weight, submitted_at, created_at)
 SELECT u.id, t.id, '2026-01-07'::date, 'Báo cáo danh sách KH, doanh thu, sản lượng, dịch vụ  Quý 4.2025
-Phân tích sản lượng BQ, tuyến, loại hình dịch vụ', 0.4, NOW()
+Phân tích sản lượng BQ, tuyến, loại hình dịch vụ', 0.4, NOW(), NOW()
 FROM users u
 JOIN tasks t ON t.assignee_id = u.id AND t.title = 'Rà soát các khách hàng ngành dược'
 WHERE u.name = 'Trần Minh Nhất'
@@ -134,8 +134,8 @@ WHERE u.name = 'Trần Minh Nhất'
     WHERE dr.user_id = u.id AND dr.task_id = t.id AND dr.report_date = '2026-01-07'::date
   );
 
-INSERT INTO daily_reports (user_id, task_id, report_date, result, weight, submitted_at)
-SELECT u.id, t.id, '2026-01-08'::date, 'Tổng hợp kết quả', 0.6, NOW()
+INSERT INTO daily_reports (user_id, task_id, report_date, result, weight, submitted_at, created_at)
+SELECT u.id, t.id, '2026-01-08'::date, 'Tổng hợp kết quả', 0.6, NOW(), NOW()
 FROM users u
 JOIN tasks t ON t.assignee_id = u.id AND t.title = 'Khảo sát danh sách khách hàng hiện hữu chưa sử dụng dv hàng nặng'
 WHERE u.name = 'Phạm Thùy Dương'
@@ -144,7 +144,7 @@ WHERE u.name = 'Phạm Thùy Dương'
     WHERE dr.user_id = u.id AND dr.task_id = t.id AND dr.report_date = '2026-01-08'::date
   );
 
-INSERT INTO daily_reports (user_id, task_id, report_date, result, weight, submitted_at)
+INSERT INTO daily_reports (user_id, task_id, report_date, result, weight, submitted_at, created_at)
 SELECT u.id, t.id, '2026-01-08'::date, '- Căn cứ theo "Chỉ thị về việc triển khai Công tác trên hệ thống sàn vận tải" số 37CT-VPost Log, yêu cầu các chi nhánh:
 Các chi nhánh bắt buộc sử dụng Sàn vận tải để tạo đơn với các dịch vụ vận tải đã chuẩn hóa.
 - Phát triển và quản lý 100% đối tác vận tải: ký hợp đồng đầy đủ, cập nhật thông tin đối tác và phương tiện lên hệ thống.
@@ -153,7 +153,7 @@ Các chi nhánh bắt buộc sử dụng Sàn vận tải để tạo đơn vớ
 + Mỗi chi nhánh đăng tối thiểu 5 nhu cầu tìm vận tải/ngày trên App.
 + Đảm bảo toàn bộ CBCNV nắm rõ và thực hiện nghiêm nội dung chỉ thị.
 + Theo dõi, giám sát, phản hồi lỗi và góp ý cải tiến hệ thống trong quá trình triển khai.
-=> Hiện PTGĐ Lê Tuấn Anh yêu cầu triển khai ban dự án để rõ đầu mối chủ trì và chịu trách nhiệm chính', 0.8, NOW()
+=> Hiện PTGĐ Lê Tuấn Anh yêu cầu triển khai ban dự án để rõ đầu mối chủ trì và chịu trách nhiệm chính', 0.8, NOW(), NOW()
 FROM users u
 JOIN tasks t ON t.assignee_id = u.id AND t.title = 'Nghiên cứu phương án triển khai nền tảng VT Move'
 WHERE u.name = 'Tạ Minh Trang'
@@ -162,8 +162,8 @@ WHERE u.name = 'Tạ Minh Trang'
     WHERE dr.user_id = u.id AND dr.task_id = t.id AND dr.report_date = '2026-01-08'::date
   );
 
-INSERT INTO daily_reports (user_id, task_id, report_date, result, weight, submitted_at)
-SELECT u.id, t.id, '2026-01-29'::date, 'Đã báo cáo bản tính toán sơ bộ', 0.8, NOW()
+INSERT INTO daily_reports (user_id, task_id, report_date, result, weight, submitted_at, created_at)
+SELECT u.id, t.id, '2026-01-29'::date, 'Đã báo cáo bản tính toán sơ bộ', 0.8, NOW(), NOW()
 FROM users u
 JOIN tasks t ON t.assignee_id = u.id AND t.title = 'Trình ký kế hoạch Chi phí, lợi nhuận năm 2026'
 WHERE u.name = 'Phạm Thùy Dương'

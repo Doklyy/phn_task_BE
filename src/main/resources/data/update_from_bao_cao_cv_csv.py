@@ -166,8 +166,8 @@ WHERE TRIM(title) = TRIM({title_esc})
         weight_val = r["trong_so"] if r["trong_so"] is not None else 0.5
         title_esc = escape_sql(r["title"], 500)
         chu_tri_esc = escape_sql(r["chu_tri"])
-        sql = f"""INSERT INTO daily_reports (user_id, task_id, report_date, result, weight, submitted_at)
-SELECT u.id, t.id, '{report_date}'::date, {result_esc}, {weight_val}, NOW()
+        sql = f"""INSERT INTO daily_reports (user_id, task_id, report_date, result, weight, submitted_at, created_at)
+SELECT u.id, t.id, '{report_date}'::date, {result_esc}, {weight_val}, NOW(), NOW()
 FROM users u
 JOIN tasks t ON t.assignee_id = u.id AND TRIM(t.title) = TRIM({title_esc})
 WHERE u.name = {chu_tri_esc}
