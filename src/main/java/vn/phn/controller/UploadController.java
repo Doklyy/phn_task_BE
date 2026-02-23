@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.annotation.PostConstruct;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -66,14 +68,20 @@ public class UploadController {
 
     /**
      * Tải file đính kèm (Admin/Leader xem file nhân viên đã gửi).
-     * GET /api/upload/files/{path} với path = "uploads/xxx.ext" (đúng như trả về từ POST /upload).
+     * GET /api/upload/file?path=uploads/xxx.ext (path như trả về từ POST /upload, có thể URL-encoded).
      */
-    @GetMapping("/upload/files/{*path}")
-    public ResponseEntity<Resource> getFile(@PathVariable("path") String pathSegment) {
-        if (pathSegment == null || pathSegment.isBlank()) {
-            return ResponseEntity.notFound().build();
+    @GetMapping("/upload/file")
+    public ResponseEntity<Resource> getFile(@RequestParam("path") String pathParam) {
+        if (pathParam == null || pathParam.isBlank()) {
+            return ResponseEntity.badRequest().build();
         }
-        String path = pathSegment.startsWith("/") ? pathSegment.substring(1) : pathSegment;
+        String path;
+        try {
+            path = URLDecoder.decode(pathParam, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+        path = path.replace('\\', '/').trim();
         if (path.contains("..")) {
             return ResponseEntity.notFound().build();
         }
