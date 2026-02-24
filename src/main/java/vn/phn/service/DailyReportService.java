@@ -97,6 +97,7 @@ public class DailyReportService {
                     .missingYesterday(false)
                     .yesterday(yesterday)
                     .message(null)
+                    .missingTasks(null)
                     .build();
         }
 
@@ -108,13 +109,29 @@ public class DailyReportService {
                     .missingYesterday(false)
                     .yesterday(yesterday)
                     .message(null)
+                    .missingTasks(null)
                     .build();
         }
+
+        // Danh sách nhiệm vụ có công việc hôm qua (chưa báo cáo) — hiển thị trên màn hình chặn
+        List<ReportReminderDto.MissingTaskItem> missingTaskItems = assigneeTasks.stream()
+                .filter(t -> {
+                    LocalDate taskCreated = t.getCreatedAt() != null ? t.getCreatedAt().atZone(VIETNAM).toLocalDate() : null;
+                    if (taskCreated == null || taskCreated.isAfter(yesterday)) return false;
+                    if (t.getCompletedAt() == null) return true;
+                    return !t.getCompletedAt().toLocalDate().isBefore(yesterday);
+                })
+                .map(t -> ReportReminderDto.MissingTaskItem.builder()
+                        .taskId(t.getId())
+                        .taskTitle(t.getTitle() != null ? t.getTitle() : "Nhiệm vụ #" + t.getId())
+                        .build())
+                .collect(Collectors.toList());
 
         return ReportReminderDto.builder()
                 .missingYesterday(true)
                 .yesterday(yesterday)
-                .message("Bạn chưa báo cáo công việc ngày " + yesterday + ". Vui lòng báo cáo bù ngay.")
+                .message("Bạn chưa báo cáo công việc ngày " + yesterday + ". Vui lòng báo cáo bù trước khi sử dụng hệ thống.")
+                .missingTasks(missingTaskItems)
                 .build();
     }
 
