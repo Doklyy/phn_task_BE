@@ -2,6 +2,7 @@ C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\controller
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\dto\DailyReportDto.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\dto\UserDto.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\controller\ScoringController.java
+C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\controller\RootController.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\dto\CreateLeaveRequest.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\repository\DailyReportRepository.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\dto\AttendanceRecordDto.java
@@ -22,6 +23,7 @@ C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\dto\LeaveR
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\service\LeaveRequestService.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\config\GlobalExceptionHandler.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\dto\LoginResponse.java
+C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\dto\ReportReminderDto.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\entity\DailyReport.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\entity\LeaveRequestStatus.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\config\DataLoader.java
@@ -41,9 +43,11 @@ C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\controller
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\dto\ChangePasswordRequest.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\repository\TaskRepository.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\dto\TaskDto.java
+C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\dto\UpdateTaskRequest.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\dto\CreateTaskRequest.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\config\WebConfig.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\entity\TaskStatus.java
+C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\config\ReportDeadlineConfig.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\entity\AttendanceCode.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\entity\LeaveRequestType.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\PhnApplication.java

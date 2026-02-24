@@ -140,7 +140,7 @@ VALUES
 INSERT INTO tasks
   (title, content, objective, deadline, weight, status, assigner_id, leader_id, assignee_id, created_at)
 VALUES
-  ('Ban hành hướng dẫn triển khai thuê xe cá nhân hoặc hộ kinh doanh để làm dịch vụ tự thu tự phát', '', 'Mục tiêu từ file CSV ngày 02/02/2026', '2026-02-10 00:00:00', 0.5, 'ACCEPTED',
+  ('Ban hành hướng dẫn triển khai thuê xe cá nhân hoặc hộ kinh doanh để làm dịch vụ tự thu tự phát', '', 'Mục tiêu từ file CSV ngày 02/02/2026', '2026-02-11 00:00:00', 0.5, 'ACCEPTED',
    (SELECT id FROM users WHERE username = 'admin' LIMIT 1),
    (SELECT id FROM users WHERE name = 'Tạ Minh Trang' LIMIT 1),
    (SELECT id FROM users WHERE name = 'Tạ Minh Trang' LIMIT 1),
