@@ -68,23 +68,28 @@ public class DailyReportService {
                 .collect(Collectors.toList());
     }
 
+    /** Múi giờ Việt Nam: dùng để xác định "hôm nay", "hôm qua" và 24:00 theo quy định. */
+    private static final ZoneId VIETNAM = ZoneId.of("Asia/Ho_Chi_Minh");
+
     /**
-     * Kiểm tra nhắc báo cáo: nếu ngày hôm trước user có công việc (assignee, đang thực hiện) mà chưa báo cáo thì cần nhắc bù.
+     * Kiểm tra nhắc báo cáo: nếu ngày hôm trước (theo giờ VN) user có công việc mà chưa báo cáo thì yêu cầu báo cáo bù.
+     * Quy định: đến 24:00 chưa báo cáo thì coi là chưa hoàn thành; sáng hôm sau hệ thống nhắc báo cáo bù.
      */
     public ReportReminderDto getReportReminder(Long userId) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(VIETNAM);
         LocalDate yesterday = today.minusDays(1);
-        ZoneId zone = ZoneId.systemDefault();
 
         List<Task> assigneeTasks = taskRepository.findByAssigneeIdOrderByDeadlineAsc(userId).stream()
                 .filter(t -> t.getStatus() == TaskStatus.ACCEPTED || t.getStatus() == TaskStatus.NEW)
                 .collect(Collectors.toList());
 
+        // Có công việc hôm qua = có ít nhất một task tồn tại trong ngày hôm qua (kể cả đã hoàn thành trong ngày hôm qua).
         boolean hadWorkYesterday = assigneeTasks.stream().anyMatch(t -> {
-            LocalDate taskCreated = t.getCreatedAt() != null ? t.getCreatedAt().atZone(zone).toLocalDate() : null;
+            LocalDate taskCreated = t.getCreatedAt() != null ? t.getCreatedAt().atZone(VIETNAM).toLocalDate() : null;
             if (taskCreated == null || taskCreated.isAfter(yesterday)) return false;
             if (t.getCompletedAt() == null) return true;
-            return t.getCompletedAt().toLocalDate().isAfter(yesterday);
+            // Hoàn thành trong hoặc sau ngày hôm qua => vẫn coi là có việc hôm qua (phải báo cáo).
+            return !t.getCompletedAt().toLocalDate().isBefore(yesterday);
         });
 
         if (!hadWorkYesterday) {
@@ -150,14 +155,13 @@ public class DailyReportService {
 
             int requiredDays = 0;
             int missedDays = 0;
-            ZoneId zone = ZoneId.systemDefault();
             for (LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
                 final LocalDate day = d;
                 boolean hadBacklog = assigneeTasks.stream().anyMatch(t -> {
-                    LocalDate taskCreated = t.getCreatedAt() != null ? t.getCreatedAt().atZone(zone).toLocalDate() : null;
+                    LocalDate taskCreated = t.getCreatedAt() != null ? t.getCreatedAt().atZone(VIETNAM).toLocalDate() : null;
                     if (taskCreated == null || taskCreated.isAfter(day)) return false;
                     if (t.getCompletedAt() == null) return true;
-                    return t.getCompletedAt().toLocalDate().isAfter(day);
+                    return !t.getCompletedAt().toLocalDate().isBefore(day);
                 });
                 if (!hadBacklog) continue;
                 requiredDays++;
