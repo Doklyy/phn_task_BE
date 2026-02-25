@@ -32,4 +32,7 @@ public class TaskDto {
     private String completionNote;
     private String completionLink;
     private String completionFilePath;
+    /** Lịch sử trả về: lý do và thời điểm lần trả về gần nhất */
+    private String lastRejectReason;
+    private LocalDateTime lastRejectAt;
 }

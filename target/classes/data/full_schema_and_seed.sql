@@ -50,6 +50,8 @@ CREATE TABLE tasks (
   completion_file_path VARCHAR(500) NULL,
   created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   completed_at DATETIME NULL,
+  last_reject_reason VARCHAR(2000) NULL,
+  last_reject_at DATETIME NULL,
   PRIMARY KEY (id),
   KEY idx_tasks_assignee (assignee_id),
   KEY idx_tasks_leader (leader_id),

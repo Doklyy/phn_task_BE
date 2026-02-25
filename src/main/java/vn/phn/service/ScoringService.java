@@ -10,6 +10,7 @@ import vn.phn.repository.DailyReportRepository;
 import vn.phn.repository.TaskRepository;
 import vn.phn.repository.UserRepository;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -47,7 +48,8 @@ public class ScoringService {
                 .distinct()
                 .count();
 
-        long workingDays = ChronoUnit.DAYS.between(startDate, endDate) + 1;
+        // Chuyên cần = số ngày báo cáo / số ngày làm việc (T2–T6), không tính T7–CN
+        long workingDays = countWorkingDays(startDate, endDate);
         double attendanceScore = workingDays > 0 ? Math.min(1.0, (double) reportedDays / workingDays) : 0;
 
         // Tính điểm chất lượng W_Q_T từ các task trong kỳ
@@ -116,6 +118,17 @@ public class ScoringService {
                 .reportedDays((int) reportedDays)
                 .completedTasks((int) tasksInPeriod.stream().filter(t -> t.getStatus() == TaskStatus.COMPLETED).count())
                 .build();
+    }
+
+    /** Đếm số ngày làm việc (T2–T6) trong khoảng [start, end] (bao gồm cả hai đầu). */
+    private static long countWorkingDays(LocalDate start, LocalDate end) {
+        if (start.isAfter(end)) return 0;
+        long count = 0;
+        for (LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
+            DayOfWeek dow = d.getDayOfWeek();
+            if (dow != DayOfWeek.SATURDAY && dow != DayOfWeek.SUNDAY) count++;
+        }
+        return count;
     }
 
     /**

@@ -292,6 +292,8 @@ public class TaskService {
                 .completionNote(t.getCompletionNote())
                 .completionLink(t.getCompletionLink())
                 .completionFilePath(t.getCompletionFilePath())
+                .lastRejectReason(t.getLastRejectReason())
+                .lastRejectAt(t.getLastRejectAt())
                 .build();
     }
 
@@ -351,7 +353,7 @@ public class TaskService {
      * Leader (người phân công) hoặc Admin từ chối → trả về công việc còn tồn đọng (ACCEPTED).
      */
     @Transactional
-    public TaskDto rejectCompletion(Long taskId, Long approverId) {
+    public TaskDto rejectCompletion(Long taskId, Long approverId, String reason) {
         Task task = taskRepository.findById(taskId).orElse(null);
         if (task == null) return null;
         User approver = userRepository.findById(approverId).orElse(null);
@@ -376,6 +378,10 @@ public class TaskService {
         task.setCompletionNote(null);
         task.setCompletionLink(null);
         task.setCompletionFilePath(null);
+        if (reason != null && !reason.isBlank()) {
+            task.setLastRejectReason(reason.trim());
+            task.setLastRejectAt(LocalDateTime.now());
+        }
         task = taskRepository.save(task);
         return toDto(task, approver);
     }

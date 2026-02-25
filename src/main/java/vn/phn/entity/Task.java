@@ -78,6 +78,13 @@ public class Task {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    /** Lý do trả về tồn đọng lần gần nhất (Leader/Admin từ chối hoàn thành) */
+    @Column(name = "last_reject_reason", length = 2000)
+    private String lastRejectReason;
+
+    @Column(name = "last_reject_at")
+    private LocalDateTime lastRejectAt;
+
     @PrePersist
     protected void onCreate() {
         createdAt = Instant.now();

@@ -128,7 +128,7 @@ public class TaskController {
             @PathVariable Long taskId,
             @RequestParam Long userId,
             @RequestParam(required = false) String reason) {
-        TaskDto updated = taskService.rejectCompletion(taskId, userId);
+        TaskDto updated = taskService.rejectCompletion(taskId, userId, reason);
         return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.badRequest().build();
     }
 
