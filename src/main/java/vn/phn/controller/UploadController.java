@@ -1,128 +1,100 @@
 package vn.phn.controller;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import jakarta.annotation.PostConstruct;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Upload và tải file đính kèm (báo cáo, hoàn thành nhiệm vụ).
+ * POST /api/upload → trả về { "path": "..." }
+ * GET /api/upload/file?path=... → trả về nội dung file.
+ */
 @RestController
 @RequestMapping("/api")
 @CrossOrigin(origins = {"http://localhost:5173", "http://127.0.0.1:5173", "https://phn-task.onrender.com"})
 public class UploadController {
 
-    @Value("${app.upload.dir:uploads}")
-    private String uploadDir;
+    private static final String UPLOAD_DIR = "uploads";
 
-    @PostConstruct
-    public void init() {
+    private static Path getUploadBasePath() {
+        Path base = Paths.get(System.getProperty("user.dir"), UPLOAD_DIR);
         try {
-            Files.createDirectories(Paths.get(uploadDir).toAbsolutePath().normalize());
-        } catch (Exception ignored) { }
+            if (!Files.exists(base)) {
+                Files.createDirectories(base);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Không tạo được thư mục upload", e);
+        }
+        return base;
     }
 
     /**
-     * Upload file (báo cáo hoàn thành, báo cáo hàng ngày).
-     * POST /api/upload → multipart/form-data, file field name: "file"
-     * Trả về { "path": "uploads/xxx.ext" } để FE gửi kèm khi submit báo cáo.
+     * POST /api/upload
+     * Part name: "file"
      */
     @PostMapping("/upload")
     public ResponseEntity<Map<String, String>> upload(@RequestParam("file") MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(Map.of("message", "Chưa chọn file."));
         }
+        String originalName = file.getOriginalFilename();
+        if (originalName == null || originalName.isBlank()) {
+            originalName = "file";
+        }
+        String ext = "";
+        int dot = originalName.lastIndexOf('.');
+        if (dot > 0) {
+            ext = originalName.substring(dot);
+        }
+        String safeName = UUID.randomUUID().toString().replace("-", "") + ext;
+        Path base = getUploadBasePath();
+        Path target = base.resolve(safeName);
         try {
-            Path dir = Paths.get(uploadDir).toAbsolutePath().normalize();
-            Files.createDirectories(dir);
-            String originalName = file.getOriginalFilename();
-            if (originalName == null || originalName.isBlank()) originalName = "file";
-            String ext = "";
-            int dot = originalName.lastIndexOf('.');
-            if (dot > 0) ext = originalName.substring(dot);
-            String name = UUID.randomUUID().toString().replace("-", "").substring(0, 12) + ext;
-            Path target = dir.resolve(name);
-            file.transferTo(target.toFile());
-            String path = uploadDir + "/" + name;
-            Map<String, String> body = new HashMap<>();
-            body.put("path", path);
-            return ResponseEntity.ok(body);
-        } catch (Exception e) {
-            Map<String, String> err = new HashMap<>();
-            err.put("message", "Tải file lên thất bại: " + (e.getMessage() != null ? e.getMessage() : "lỗi hệ thống"));
-            return ResponseEntity.status(500).body(err);
+            Files.write(target, file.getBytes());
+        } catch (IOException e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Lưu file thất bại: " + e.getMessage()));
         }
+        String relativePath = UPLOAD_DIR + "/" + safeName;
+        return ResponseEntity.ok(Map.of("path", relativePath, "filePath", relativePath));
     }
 
     /**
-     * Tải file đính kèm (Admin/Leader xem file nhân viên đã gửi).
-     * GET /api/upload/file?path=uploads/xxx.ext (path như trả về từ POST /upload, có thể URL-encoded).
+     * GET /api/upload/file?path=...
+     * Trả về file để xem/tải. path là relative (vd: uploads/abc123.pdf).
      */
     @GetMapping("/upload/file")
-    public ResponseEntity<Resource> getFile(@RequestParam("path") String pathParam) {
+    public ResponseEntity<byte[]> getFile(@RequestParam("path") String pathParam) {
         if (pathParam == null || pathParam.isBlank()) {
             return ResponseEntity.badRequest().build();
         }
-        try {
-            String path = URLDecoder.decode(pathParam, StandardCharsets.UTF_8);
-            return serveFile(path);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
+        String safe = pathParam.replace("..", "").replace("\\", "/").trim();
+        if (safe.startsWith("/")) safe = safe.substring(1);
+        Path base = getUploadBasePath();
+        Path resolved = base.resolve(Paths.get(safe).getFileName().toString()).normalize();
+        if (!resolved.startsWith(base)) {
+            return ResponseEntity.status(403).build();
         }
-    }
-
-    /**
-     * Tải file – URL cũ (FE có thể vẫn gọi /api/upload/files/uploads%2Fxxx.xlsx).
-     * Hỗ trợ cả hai dạng để link luôn tải được.
-     */
-    @GetMapping("/upload/files/{*pathSegment}")
-    public ResponseEntity<Resource> getFileLegacy(@PathVariable("pathSegment") String pathSegment) {
-        if (pathSegment == null || pathSegment.isBlank()) {
+        if (!Files.isRegularFile(resolved)) {
             return ResponseEntity.notFound().build();
         }
         try {
-            String path = URLDecoder.decode(pathSegment, StandardCharsets.UTF_8);
-            path = path.startsWith("/") ? path.substring(1) : path;
-            return serveFile(path);
-        } catch (Exception e) {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    private ResponseEntity<Resource> serveFile(String path) {
-        path = path.replace('\\', '/').trim();
-        if (path.contains("..")) {
-            return ResponseEntity.notFound().build();
-        }
-        try {
-            Path base = Paths.get(uploadDir).toAbsolutePath().normalize();
-            Path file = base.getParent().resolve(path).normalize();
-            if (!file.startsWith(base)) {
-                return ResponseEntity.notFound().build();
-            }
-            if (!Files.isRegularFile(file)) {
-                return ResponseEntity.notFound().build();
-            }
-            Resource resource = new InputStreamResource(Files.newInputStream(file));
-            String name = file.getFileName().toString();
-            return ResponseEntity.ok()
-                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + name + "\"")
-                    .body(resource);
-        } catch (Exception e) {
-            return ResponseEntity.notFound().build();
+            byte[] bytes = Files.readAllBytes(resolved);
+            String name = resolved.getFileName().toString();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", name);
+            return ResponseEntity.ok().headers(headers).body(bytes);
+        } catch (IOException e) {
+            return ResponseEntity.status(500).build();
         }
     }
 }
