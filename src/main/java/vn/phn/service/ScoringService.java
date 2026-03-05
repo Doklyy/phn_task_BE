@@ -26,22 +26,20 @@ public class ScoringService {
 
     /**
      * Tính điểm chuyên cần và chất lượng (W_Q_T) cho một user.
-     * - Điểm chuyên cần: tỷ lệ số ngày báo cáo / số ngày làm việc (30 ngày gần nhất)
-     * - Điểm chất lượng W_Q_T (0..1):
-     *   + Mỗi task có: W (trọng số), Q (chất lượng), T (tiến độ).
-     *   + Điểm đạt cho 1 task: W * Q * T.
-     *   + Điểm giao: tổng W của tất cả task được giao trong kỳ.
-     *   + Điểm chất lượng = (Tổng điểm đạt / Tổng điểm giao), giới hạn 0..1.
+     * Kỳ tính: từ mùng 1 tháng hiện tại đến hôm nay — mỗi đầu tháng (mùng 1) điểm reset.
+     * - Điểm chuyên cần: tỷ lệ số ngày báo cáo / số ngày làm việc (T2–T6) trong tháng hiện tại.
+     * - Điểm chất lượng W_Q_T (0..1): W×Q×T / tổng W; Q = chất lượng (hoặc 1 nếu hoàn thành chưa chấm), T = 1 đúng hạn / 0.5 trễ hoặc chưa đến hạn / 0 quá hạn.
      * - Tổng điểm = (chuyên cần * 0.4) + (chất lượng * 0.6).
      */
     public ScoringDto calculateScore(Long userId) {
         User user = userRepository.findById(userId).orElse(null);
         if (user == null) return null;
 
-        LocalDate startDate = LocalDate.now().minusDays(30); // 30 ngày gần nhất
-        LocalDate endDate = LocalDate.now();
+        LocalDate now = LocalDate.now();
+        LocalDate startDate = now.withDayOfMonth(1); // Mùng 1 đầu tháng → reset điểm
+        LocalDate endDate = now;
 
-        // Đếm số ngày đã báo cáo trong 30 ngày gần nhất
+        // Đếm số ngày đã báo cáo trong tháng hiện tại (từ mùng 1 đến hôm nay)
         long reportedDays = reportRepository.findByUserIdOrderByReportDateDesc(userId).stream()
                 .filter(r -> !r.getReportDate().isBefore(startDate) && !r.getReportDate().isAfter(endDate))
                 .map(r -> r.getReportDate())
