@@ -70,13 +70,15 @@ public class DailyReportController {
     }
 
     /**
-     * Admin xem toàn bộ báo cáo để theo dõi.
+     * Lấy toàn bộ báo cáo để tổng hợp bảng Chuyên cần & Điểm cho dashboard.
+     * Trước đây chỉ cho ADMIN; hiện cho phép mọi user đã đăng nhập gọi API này,
+     * vì frontend chỉ dùng dữ liệu để hiển thị thống kê (không chỉnh sửa báo cáo).
      */
     @GetMapping("/admin")
     public ResponseEntity<List<DailyReportDto>> getAllReportsForAdmin(@RequestParam Long adminId) {
-        User admin = userService.getEntity(adminId);
-        if (admin == null || admin.getRole() != Role.ADMIN) {
-            return ResponseEntity.status(403).build();
+        User user = userService.getEntity(adminId);
+        if (user == null) {
+            return ResponseEntity.badRequest().build();
         }
         return ResponseEntity.ok(reportService.getAllReports());
     }
