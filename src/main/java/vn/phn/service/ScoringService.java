@@ -13,6 +13,7 @@ import vn.phn.repository.UserRepository;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
@@ -25,21 +26,25 @@ public class ScoringService {
     private final DailyReportRepository reportRepository;
 
     /**
-     * Tính điểm chuyên cần và chất lượng (W_Q_T) cho một user.
-     * Kỳ tính: từ mùng 1 tháng hiện tại đến hôm nay — mỗi đầu tháng (mùng 1) điểm reset.
-     * - Điểm chuyên cần: tỷ lệ số ngày báo cáo / số ngày làm việc (T2–T6) trong tháng hiện tại.
+     * Tính điểm chuyên cần và chất lượng (W_Q_T) cho một user theo từng tháng.
+     * - Nếu month == null → dùng tháng hiện tại, kỳ tính = từ mùng 1 tới hôm nay.
+     * - Nếu month != null (YearMonth cụ thể, ví dụ 2026-02) → kỳ tính = full tháng đó (từ ngày 1 đến ngày cuối tháng).
+     * - Điểm chuyên cần: tỷ lệ số ngày báo cáo / số ngày làm việc (T2–T6) trong kỳ.
      * - Điểm chất lượng W_Q_T (0..1): W×Q×T / tổng W; Q = chất lượng (hoặc 1 nếu hoàn thành chưa chấm), T = 1 đúng hạn / 0.5 trễ hoặc chưa đến hạn / 0 quá hạn.
      * - Tổng điểm = (chuyên cần * 0.4) + (chất lượng * 0.6).
      */
-    public ScoringDto calculateScore(Long userId) {
+    public ScoringDto calculateScore(Long userId, YearMonth month) {
         User user = userRepository.findById(userId).orElse(null);
         if (user == null) return null;
 
-        LocalDate now = LocalDate.now();
-        LocalDate startDate = now.withDayOfMonth(1); // Mùng 1 đầu tháng → reset điểm
-        LocalDate endDate = now;
+        LocalDate today = LocalDate.now();
+        YearMonth currentMonth = YearMonth.from(today);
+        YearMonth targetMonth = (month != null) ? month : currentMonth;
 
-        // Đếm số ngày đã báo cáo trong tháng hiện tại (từ mùng 1 đến hôm nay)
+        LocalDate startDate = targetMonth.atDay(1);
+        LocalDate endDate = targetMonth.equals(currentMonth) ? today : targetMonth.atEndOfMonth();
+
+        // Đếm số ngày đã báo cáo trong kỳ (tháng được chọn)
         long reportedDays = reportRepository.findByUserIdOrderByReportDateDesc(userId).stream()
                 .filter(r -> !r.getReportDate().isBefore(startDate) && !r.getReportDate().isAfter(endDate))
                 .map(r -> r.getReportDate())
@@ -118,6 +123,13 @@ public class ScoringService {
                 .build();
     }
 
+    /**
+     * Tiện ích: tính điểm cho tháng hiện tại (giữ API cũ cho các chỗ khác đang gọi).
+     */
+    public ScoringDto calculateScore(Long userId) {
+        return calculateScore(userId, null);
+    }
+
     /** Đếm số ngày làm việc (T2–T6) trong khoảng [start, end] (bao gồm cả hai đầu). */
     private static long countWorkingDays(LocalDate start, LocalDate end) {
         if (start.isAfter(end)) return 0;
@@ -130,13 +142,18 @@ public class ScoringService {
     }
 
     /**
-     * Lấy bảng xếp hạng điểm cho tất cả user (hoặc theo role).
+     * Lấy bảng xếp hạng điểm cho tất cả user theo tháng.
+     * - Nếu month == null → dùng tháng hiện tại.
      */
-    public List<ScoringDto> getRanking() {
+    public List<ScoringDto> getRanking(YearMonth month) {
         return userRepository.findAll().stream()
-                .map(u -> calculateScore(u.getId()))
+                .map(u -> calculateScore(u.getId(), month))
                 .filter(s -> s != null)
                 .sorted((s1, s2) -> Double.compare(s2.getTotalScore(), s1.getTotalScore())) // Giảm dần
                 .toList();
+    }
+
+    public List<ScoringDto> getRanking() {
+        return getRanking(null);
     }
 }

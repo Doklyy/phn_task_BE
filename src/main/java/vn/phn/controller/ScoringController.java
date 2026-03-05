@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.*;
 import vn.phn.dto.ScoringDto;
 import vn.phn.service.ScoringService;
 
+import java.time.YearMonth;
 import java.util.List;
 
 @RestController
@@ -17,19 +18,35 @@ public class ScoringController {
     private final ScoringService scoringService;
 
     /**
-     * Tính điểm chuyên cần và chất lượng (WQT) cho một user.
+     * Tính điểm chuyên cần và chất lượng (WQT) cho một user theo tháng.
+     * Query optional: ?month=YYYY-MM
      */
     @GetMapping("/user/{userId}")
-    public ResponseEntity<ScoringDto> getUserScore(@PathVariable Long userId) {
-        ScoringDto score = scoringService.calculateScore(userId);
+    public ResponseEntity<ScoringDto> getUserScore(
+            @PathVariable Long userId,
+            @RequestParam(required = false) String month) {
+        YearMonth ym = parseMonth(month);
+        ScoringDto score = scoringService.calculateScore(userId, ym);
         return score != null ? ResponseEntity.ok(score) : ResponseEntity.notFound().build();
     }
 
     /**
-     * Lấy bảng xếp hạng điểm cho tất cả user.
+     * Lấy bảng xếp hạng điểm cho tất cả user theo tháng (mỗi tháng reset).
+     * Query optional: ?month=YYYY-MM
      */
     @GetMapping("/ranking")
-    public ResponseEntity<List<ScoringDto>> getRanking() {
-        return ResponseEntity.ok(scoringService.getRanking());
+    public ResponseEntity<List<ScoringDto>> getRanking(
+            @RequestParam(required = false) String month) {
+        YearMonth ym = parseMonth(month);
+        return ResponseEntity.ok(scoringService.getRanking(ym));
+    }
+
+    private YearMonth parseMonth(String month) {
+        if (month == null || month.isBlank()) return null;
+        try {
+            return YearMonth.parse(month);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }
