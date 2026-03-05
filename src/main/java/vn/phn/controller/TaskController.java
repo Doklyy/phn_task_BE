@@ -32,7 +32,14 @@ public class TaskController {
 
     /**
      * Lấy danh sách nhiệm vụ theo User ID và quyền (FE gửi userId, backend tự lấy role từ DB).
-     * Query: ?userId=1 hoặc header X-User-Id
+     * Query cơ bản: ?userId=1
+     * - Admin: thấy tất cả nhiệm vụ.
+     * - Leader: task mình là leader hoặc assignee.
+     * - Staff: task mình là assignee.
+     *
+     * Tham số forRanking=true:
+     * - Bỏ qua quyền thực tế, luôn trả về như ADMIN (tất cả nhiệm vụ) để FE dùng cho Bảng đánh giá điểm & Chuyên cần
+     *   hiển thị giống admin cho mọi role, nhưng FE chỉ dùng để tổng hợp, không cho chỉnh sửa.
      */
     @GetMapping
     public ResponseEntity<List<TaskDto>> getTasks(
@@ -40,12 +47,16 @@ public class TaskController {
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) Integer month,
             @RequestParam(required = false) Integer quarter,
-            @RequestParam(required = false, defaultValue = "all") String filter) {
+            @RequestParam(required = false, defaultValue = "all") String filter,
+            @RequestParam(required = false, defaultValue = "false") boolean forRanking) {
 
         User user = userService.getEntity(userId);
         if (user == null)
             return ResponseEntity.badRequest().build();
         Role role = user.getRole();
+        if (forRanking) {
+            role = Role.ADMIN;
+        }
 
         List<TaskDto> tasks;
         if (filter.equalsIgnoreCase("month") && year != null && month != null) {
