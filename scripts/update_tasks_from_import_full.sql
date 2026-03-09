@@ -53,11 +53,11 @@ SET
   ),
   status = COALESCE(
     CASE trim(lower(i.trang_thai_cv))
-      WHEN 'hoàn thành đúng hạn' THEN 'COMPLETED'
-      WHEN 'hoàn thành sau hạn'  THEN 'COMPLETED'
-      WHEN 'đang thực hiện'     THEN 'ACCEPTED'
-      WHEN 'tạm dừng'           THEN 'PAUSED'
-      WHEN 'không hoàn thành'   THEN 'NEW'
+      WHEN 'hoàn thành đúng hạn' THEN 'completed'
+      WHEN 'hoàn thành sau hạn'  THEN 'completed'
+      WHEN 'đang thực hiện'     THEN 'accepted'
+      WHEN 'tạm dừng'           THEN 'paused'
+      WHEN 'không hoàn thành'   THEN 'new'
       ELSE t.status
     END,
     t.status

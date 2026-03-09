@@ -29,8 +29,8 @@ public class ScoringService {
      * Tính điểm chuyên cần và chất lượng (W_Q_T) cho một user theo từng tháng.
      * - Nếu month == null → dùng tháng hiện tại, kỳ tính = từ mùng 1 tới hôm nay.
      * - Nếu month != null (YearMonth cụ thể, ví dụ 2026-02) → kỳ tính = full tháng đó (từ ngày 1 đến ngày cuối tháng).
-     * - Điểm chuyên cần: tỷ lệ số ngày báo cáo / số ngày làm việc (T2–T6) trong kỳ.
-     * - Điểm chất lượng W_Q_T (0..1): W×Q×T / tổng W; Q = chất lượng (hoặc 1 nếu hoàn thành chưa chấm), T = 1 đúng hạn / 0.5 trễ hoặc chưa đến hạn / 0 quá hạn.
+     * - Điểm chuyên cần: tỷ lệ thời gian làm việc/báo cáo trong kỳ (0..1). Với các tháng bình thường lấy theo báo cáo ngày; riêng tháng 2026-02 dùng bảng “Thưởng thời gian làm việc”.
+     * - Điểm chất lượng W_Q_T (0..1): W×Q×T / tổng W; Q = chất lượng, T = 1 đúng hạn / 0.7 trễ / 0 không hoàn thành.
      * - Tổng điểm = (chuyên cần * 0.4) + (chất lượng * 0.6).
      */
     public ScoringDto calculateScore(Long userId, YearMonth month) {
@@ -44,16 +44,28 @@ public class ScoringService {
         LocalDate startDate = targetMonth.atDay(1);
         LocalDate endDate = targetMonth.equals(currentMonth) ? today : targetMonth.atEndOfMonth();
 
-        // Đếm số ngày đã báo cáo trong kỳ (tháng được chọn)
-        long reportedDays = reportRepository.findByUserIdOrderByReportDateDesc(userId).stream()
-                .filter(r -> !r.getReportDate().isBefore(startDate) && !r.getReportDate().isAfter(endDate))
-                .map(r -> r.getReportDate())
-                .distinct()
-                .count();
+        // Điểm CHUYÊN CẦN
+        long reportedDays;
+        long workingDays;
+        double attendanceScore;
 
-        // Chuyên cần = số ngày báo cáo / số ngày làm việc (T2–T6), không tính T7–CN
-        long workingDays = countWorkingDays(startDate, endDate);
-        double attendanceScore = workingDays > 0 ? Math.min(1.0, (double) reportedDays / workingDays) : 0;
+        // Tháng 2/2026: dùng bảng “Thưởng thời gian làm việc” (01/02–18/02) thay vì đọc từ daily_reports.
+        if (targetMonth.equals(YearMonth.of(2026, 2))) {
+            workingDays = 20; // số ngày làm việc chuẩn trong tháng 2/2026 (T2–T6)
+            attendanceScore = getManualTimeWorkScoreForFeb2026(user);
+            reportedDays = (long) Math.round(attendanceScore * workingDays);
+        } else {
+            // Đếm số ngày đã báo cáo trong kỳ (tháng được chọn)
+            reportedDays = reportRepository.findByUserIdOrderByReportDateDesc(userId).stream()
+                    .filter(r -> !r.getReportDate().isBefore(startDate) && !r.getReportDate().isAfter(endDate))
+                    .map(r -> r.getReportDate())
+                    .distinct()
+                    .count();
+
+            // Chuyên cần = số ngày báo cáo / số ngày làm việc (T2–T6), không tính T7–CN
+            workingDays = countWorkingDays(startDate, endDate);
+            attendanceScore = workingDays > 0 ? Math.min(1.0, (double) reportedDays / workingDays) : 0;
+        }
 
         // Tính điểm chất lượng W_Q_T từ các task trong kỳ
         List<Task> tasksInPeriod = taskRepository.findByAssigneeIdOrderByDeadlineAsc(userId).stream()
@@ -64,44 +76,19 @@ public class ScoringService {
                 })
                 .toList();
 
-        double totalAssignedW = tasksInPeriod.stream()
-                .mapToDouble(t -> t.getWeight() != null ? t.getWeight() : 0d)
-                .sum();
+        double totalAssignedW = 0d;
+        double totalAchieved = 0d;
+        for (Task t : tasksInPeriod) {
+            Double rawWeight = t.getWeight();
+            if (rawWeight == null || rawWeight <= 0) continue;
+            int w = weightToW(rawWeight);
+            double q = t.getQuality() != null ? t.getQuality() : 0.0;
+            double T = taskTFactor(t);
+            totalAssignedW += w;
+            totalAchieved += (w * q * T);
+        }
 
-        double totalAchieved = tasksInPeriod.stream()
-                .mapToDouble(t -> {
-                    Double w = t.getWeight();
-                    if (w == null || w <= 0) return 0d;
-
-                    // Q: nếu có quality thì dùng, nếu task đã hoàn thành mà chưa có quality thì mặc định 1, ngược lại 0.
-                    double q;
-                    if (t.getQuality() != null) {
-                        q = t.getQuality();
-                    } else if (t.getStatus() == TaskStatus.COMPLETED) {
-                        q = 1.0;
-                    } else {
-                        q = 0.0;
-                    }
-
-                    // T: tiến độ theo deadline & completedAt
-                    double T;
-                    LocalDateTime deadlineDateTime = t.getDeadline();
-                    LocalDateTime completedAt = t.getCompletedAt();
-                    LocalDateTime nowDateTime = LocalDateTime.now();
-
-                    if (completedAt != null) {
-                        // Hoàn thành đúng hạn: 1, muộn: 0.5
-                        T = completedAt.isAfter(deadlineDateTime) ? 0.5 : 1.0;
-                    } else {
-                        // Chưa hoàn thành: nếu chưa tới hạn thì 0.5, quá hạn thì 0
-                        T = nowDateTime.isAfter(deadlineDateTime) ? 0.0 : 0.5;
-                    }
-
-                    return w * q * T;
-                })
-                .sum();
-
-        double qualityScore = 0;
+        double qualityScore = 0d;
         if (totalAssignedW > 0) {
             qualityScore = Math.min(1.0, totalAchieved / totalAssignedW);
         }
@@ -139,6 +126,44 @@ public class ScoringService {
             if (dow != DayOfWeek.SATURDAY && dow != DayOfWeek.SUNDAY) count++;
         }
         return count;
+    }
+
+    /** Mapping trọng số (0–1) → W (1, 2, 3, 5, 8) giống file Excel. */
+    private static int weightToW(double weight) {
+        if (weight <= 0.25) return 1;
+        if (weight <= 0.50) return 2;
+        if (weight <= 0.70) return 3;
+        if (weight <= 0.90) return 5;
+        return 8;
+    }
+
+    /** Hệ số T: 1 = hoàn thành đúng hạn, 0.7 = hoàn thành sau hạn, 0 = còn lại. */
+    private static double taskTFactor(Task task) {
+        if (task.getStatus() != TaskStatus.COMPLETED) return 0.0;
+        LocalDateTime deadline = task.getDeadline();
+        LocalDateTime completedAt = task.getCompletedAt();
+        if (deadline == null || completedAt == null) return 0.0;
+        return completedAt.isAfter(deadline) ? 0.7 : 1.0;
+    }
+
+    /**
+     * Điểm chuyên cần đặc biệt cho tháng 02/2026 dựa trên bảng \"Thưởng thời gian làm việc\" (1/2–18/2).
+     * Trả về giá trị 0..1 (điểm 10 chia cho 10). Các user khác ngoài bảng dùng 0.
+     */
+    private static double getManualTimeWorkScoreForFeb2026(User user) {
+        if (user == null || user.getUsername() == null) return 0.0;
+        String username = user.getUsername().toLowerCase();
+        return switch (username) {
+            case "an" -> 9.23 / 10.0;
+            case "doan" -> 9.23 / 10.0;
+            case "duong" -> 8.94 / 10.0;
+            case "khai" -> 8.46 / 10.0;
+            case "ly" -> 8.08 / 10.0;
+            case "nam" -> 8.65 / 10.0;
+            case "nhat" -> 9.23 / 10.0;
+            case "trang" -> 7.69 / 10.0;
+            default -> 0.0;
+        };
     }
 
     /**
