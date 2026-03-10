@@ -309,10 +309,6 @@ public class TaskService {
         task.setCompletionNote(note != null && !note.isBlank() ? note.trim() : null);
         task.setCompletionLink(link != null && !link.isBlank() ? link.trim() : null);
         task.setCompletionFilePath(filePath != null && !filePath.isBlank() ? filePath.trim() : null);
-        // Ghi nhận thời điểm gửi báo cáo kết thúc – dùng cho bảng chuyên cần (coi như đã có báo cáo ngày).
-        if (task.getSubmittedAt() == null) {
-            task.setSubmittedAt(LocalDateTime.now());
-        }
         task.setStatus(TaskStatus.PENDING_APPROVAL);
         task = taskRepository.save(task);
         return toDto(task, userRepository.findById(userId).orElse(null));
