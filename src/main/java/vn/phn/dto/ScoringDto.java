@@ -17,6 +17,10 @@ public class ScoringDto {
     private Double qualityScore;
     /** Điểm W_Q_T quy đổi theo điểm chuẩn (ví dụ 15 điểm tối đa cho mục Nhiệm vụ) */
     private Double qualityScoreMax;
+    /** Điểm thưởng thời gian làm việc (thang 5đ) */
+    private Double timeWorkScore5;
+    /** Điểm báo cáo công việc cuối ngày (thang 5đ) */
+    private Double dailyReportScore5;
     /** Tổng điểm = (attendanceScore * 0.4) + (qualityScore * 0.6) */
     private Double totalScore;
     /** Số ngày đã báo cáo */

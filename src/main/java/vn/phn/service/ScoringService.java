@@ -48,12 +48,19 @@ public class ScoringService {
         long reportedDays;
         long workingDays;
         double attendanceScore;
+        // Tách riêng: thưởng thời gian làm việc & báo cáo cuối ngày (thang 5đ)
+        double timeWorkScore5 = 0d;
+        double dailyReportScore5 = 0d;
 
         // Tháng 2/2026: dùng bảng “Thưởng thời gian làm việc” (01/02–18/02) thay vì đọc từ daily_reports.
         if (targetMonth.equals(YearMonth.of(2026, 2))) {
             workingDays = 20; // số ngày làm việc chuẩn trong tháng 2/2026 (T2–T6)
             attendanceScore = getManualTimeWorkScoreForFeb2026(user);
             reportedDays = (long) Math.round(attendanceScore * workingDays);
+            // Thưởng thời gian làm việc: scale về thang 5
+            timeWorkScore5 = attendanceScore * 5.0;
+            // Báo cáo hàng ngày: mỗi ngày 1 điểm, max 5 điểm
+            dailyReportScore5 = Math.min(5.0, (double) reportedDays);
         } else {
             // Đếm số ngày đã báo cáo trong kỳ (tháng được chọn)
             reportedDays = reportRepository.findByUserIdOrderByReportDateDesc(userId).stream()
@@ -65,6 +72,10 @@ public class ScoringService {
             // Chuyên cần = số ngày báo cáo / số ngày làm việc (T2–T6), không tính T7–CN
             workingDays = countWorkingDays(startDate, endDate);
             attendanceScore = workingDays > 0 ? Math.min(1.0, (double) reportedDays / workingDays) : 0;
+            // Thưởng thời gian làm việc (5đ) = tỷ lệ chuyên cần * 5
+            timeWorkScore5 = attendanceScore * 5.0;
+            // Báo cáo hàng ngày: mỗi ngày 1 điểm, max 5 điểm
+            dailyReportScore5 = Math.min(5.0, (double) reportedDays);
         }
 
         // Tính điểm chất lượng W_Q_T từ các task trong kỳ
@@ -104,6 +115,8 @@ public class ScoringService {
                 .attendanceScore(attendanceScore)
                 .qualityScore(qualityScore)
                 .qualityScoreMax(qualityScoreMax)
+                .timeWorkScore5(timeWorkScore5)
+                .dailyReportScore5(dailyReportScore5)
                 .totalScore(totalScore)
                 .reportedDays((int) reportedDays)
                 .completedTasks((int) tasksInPeriod.stream().filter(t -> t.getStatus() == TaskStatus.COMPLETED).count())
