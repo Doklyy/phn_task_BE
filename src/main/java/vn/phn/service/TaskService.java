@@ -10,8 +10,10 @@ import vn.phn.entity.Role;
 import vn.phn.entity.Task;
 import vn.phn.entity.TaskStatus;
 import vn.phn.entity.User;
+import vn.phn.entity.DailyReport;
 import vn.phn.repository.TaskRepository;
 import vn.phn.repository.UserRepository;
+import vn.phn.repository.DailyReportRepository;
 
 import java.util.Objects;
 
@@ -27,6 +29,7 @@ public class TaskService {
 
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
+    private final DailyReportRepository dailyReportRepository;
 
     /**
      * Công thức WQT: WQT = weight * quality (chất lượng 0..1 do Leader đánh giá).
@@ -311,6 +314,27 @@ public class TaskService {
         task.setCompletionFilePath(filePath != null && !filePath.isBlank() ? filePath.trim() : null);
         task.setStatus(TaskStatus.PENDING_APPROVAL);
         task = taskRepository.save(task);
+
+        // Tự động ghi nhận 1 báo cáo cuối ngày cho ngày hiện tại nếu chưa có,
+        // để bảng chuyên cần hiển thị 1/1 (đã báo cáo) cho ngày gửi hoàn thành.
+        LocalDateTime now = LocalDateTime.now();
+        LocalDate reportDate = now.toLocalDate();
+        dailyReportRepository.findByUserIdAndTaskIdAndReportDate(userId, taskId, reportDate)
+                .orElseGet(() -> {
+                    DailyReport dr = DailyReport.builder()
+                            .userId(userId)
+                            .taskId(taskId)
+                            .reportDate(reportDate)
+                            .result(note != null && !note.isBlank()
+                                    ? note.trim()
+                                    : "Báo cáo hoàn thành nhiệm vụ qua chức năng kết thúc công việc.")
+                            .weight(null)
+                            .submittedAt(now)
+                            .attachmentPath(filePath != null && !filePath.isBlank() ? filePath.trim() : null)
+                            .build();
+                    return dailyReportRepository.save(dr);
+                });
+
         return toDto(task, userRepository.findById(userId).orElse(null));
     }
 

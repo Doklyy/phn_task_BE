@@ -6,9 +6,11 @@ import vn.phn.dto.ScoringDto;
 import vn.phn.entity.Task;
 import vn.phn.entity.TaskStatus;
 import vn.phn.entity.User;
+import vn.phn.entity.AttendanceRecord;
 import vn.phn.repository.DailyReportRepository;
 import vn.phn.repository.TaskRepository;
 import vn.phn.repository.UserRepository;
+import vn.phn.repository.AttendanceRecordRepository;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -24,6 +26,7 @@ public class ScoringService {
     private final UserRepository userRepository;
     private final TaskRepository taskRepository;
     private final DailyReportRepository reportRepository;
+    private final AttendanceRecordRepository attendanceRecordRepository;
 
     /**
      * Tính điểm chuyên cần và chất lượng (W_Q_T) cho một user theo từng tháng.
@@ -62,16 +65,29 @@ public class ScoringService {
             // Báo cáo hàng ngày: mỗi ngày 1 điểm, max 5 điểm
             dailyReportScore5 = Math.min(5.0, (double) reportedDays);
         } else {
-            // Đếm số ngày đã báo cáo trong kỳ (tháng được chọn)
+            // Đếm số ngày đã báo cáo trong kỳ (tháng được chọn) từ daily_reports → dùng cho điểm báo cáo hàng ngày
             reportedDays = reportRepository.findByUserIdOrderByReportDateDesc(userId).stream()
                     .filter(r -> !r.getReportDate().isBefore(startDate) && !r.getReportDate().isAfter(endDate))
                     .map(r -> r.getReportDate())
                     .distinct()
                     .count();
 
-            // Chuyên cần = số ngày báo cáo / số ngày làm việc (T2–T6), không tính T7–CN
+            // Điểm chấm công (thời gian làm việc) lấy riêng từ bảng attendance_records
             workingDays = countWorkingDays(startDate, endDate);
-            attendanceScore = workingDays > 0 ? Math.min(1.0, (double) reportedDays / workingDays) : 0;
+            long attendancePresentDays = 0;
+            if (workingDays > 0) {
+                List<AttendanceRecord> records = attendanceRecordRepository
+                        .findByUserIdAndRecordDateBetween(userId, startDate, endDate);
+                attendancePresentDays = records.stream()
+                        .filter(r -> r.getPoints() != null && r.getPoints() > 0)
+                        .map(AttendanceRecord::getRecordDate)
+                        .distinct()
+                        .count();
+            }
+            attendanceScore = workingDays > 0
+                    ? Math.min(1.0, (double) attendancePresentDays / workingDays)
+                    : 0;
+
             // Thưởng thời gian làm việc (5đ) = tỷ lệ chuyên cần * 5
             timeWorkScore5 = attendanceScore * 5.0;
             // Báo cáo hàng ngày: mỗi ngày 1 điểm, max 5 điểm
