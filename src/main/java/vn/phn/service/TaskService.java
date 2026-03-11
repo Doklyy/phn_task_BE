@@ -17,6 +17,7 @@ import vn.phn.repository.DailyReportRepository;
 
 import java.util.Objects;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;

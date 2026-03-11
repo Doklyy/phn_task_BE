@@ -1,13 +1,10 @@
 package vn.phn.entity;
 
-import lombok.Getter;
-
 /**
  * Mã chuyên cần và điểm (theo bảng quy định).
  * L=8, N_FULL(N)=0, N_HALF(N4)=4, N_LATE(N1)=5, N_EARLY(N2)=5,
  * M=-8, V=-8, L_HOLIDAY(L)=0, T_HOLIDAY(T)=8, CN=0, T7=0, TT7=0, TCN=8.
  */
-@Getter
 public enum AttendanceCode {
     L(8, "Làm cả ngày"),
     N_FULL(0, "Nghỉ cả ngày (được duyệt)"),
@@ -30,4 +27,13 @@ public enum AttendanceCode {
         this.points = points;
         this.description = description;
     }
+
+    public int getPoints() {
+        return points;
+    }
+
+    public String getDescription() {
+        return description;
+    }
 }
+

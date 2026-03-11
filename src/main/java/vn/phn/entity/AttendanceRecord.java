@@ -1,6 +1,8 @@
 package vn.phn.entity;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -10,11 +12,13 @@ import java.time.LocalTime;
 
 /**
  * Bản ghi chấm công hàng ngày (map 1-1 với bảng attendance_records).
- * Chỉ dùng các trường cần cho tính điểm chuyên cần.
+ * Dùng enum AttendanceCode để đồng bộ với AttendanceService.
  */
 @Getter
 @Setter
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 @Entity
 @Table(name = "attendance_records")
 public class AttendanceRecord {
@@ -29,8 +33,9 @@ public class AttendanceRecord {
     @Column(name = "record_date", nullable = false)
     private LocalDate recordDate;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "attendance_code", nullable = false, length = 30)
-    private String attendanceCode;
+    private AttendanceCode attendanceCode;
 
     @Column(name = "points", nullable = false)
     private Integer points;
@@ -49,4 +54,7 @@ public class AttendanceRecord {
 
     @Column(name = "note", length = 1000)
     private String note;
+
+    @Column(name = "leave_request_id")
+    private Long leaveRequestId;
 }
