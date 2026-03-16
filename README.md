@@ -14,7 +14,12 @@ cd backend
 mvn spring-boot:run
 ```
 
-Server chạy tại `http://localhost:8080`. Console H2: `http://localhost:8080/h2-console` (JDBC URL: `jdbc:h2:file:./data/phn`, user: `sa`, password để trống).
+Server chạy tại `http://localhost:8080`.
+
+**Để Bảng Chuyên cần hiển thị đúng điểm (C.Tổng = 5+5đ) và ô ngày (X/Y):**
+1. **MySQL** phải chạy với cấu hình trong `src/main/resources/application.properties` (mặc định: `localhost:3307`, user `root`, password `abc1234`, database `phn`).
+2. Frontend cấu hình `.env`: `VITE_API_URL=http://localhost:8080` (hoặc `http://localhost:8080/api`).
+3. Khi backend không chạy hoặc thiếu endpoint, frontend vẫn hiển thị: C.Tổng = số ngày công, ô ngày có thể 0/X.
 
 ## Cơ sở dữ liệu
 
@@ -68,13 +73,11 @@ Base URL: `http://localhost:8080/api`
 ### Báo cáo ngày (Lịch sử báo cáo)
 - `POST /api/reports?userId=3` – Gửi báo cáo (body: `taskId`, `reportDate`, `result`, `weight`, `attachmentPath` tùy chọn). Thời gian gửi = `submittedAt` (tự động = thời điểm nhấn Gửi). File đính kèm: upload qua `/api/upload` rồi gửi `attachmentPath` trong body.
 - `GET /api/reports?userId=3` – Danh sách báo cáo của user (sắp xếp theo ngày giảm dần)
+- **`GET /api/reports/admin?adminId=1`** – Admin lấy **toàn bộ báo cáo** (dùng cho Bảng Chuyên cần). Trả về `List<DailyReportDto>` với `userId`, `taskId`, `reportDate` (YYYY-MM-DD). Nếu backend chưa chạy hoặc endpoint lỗi, frontend fallback: ô ngày có thể 0/X.
 
 ### Chấm điểm (Scoring)
-- `GET /api/scoring/user/{userId}` – Tính điểm chuyên cần và chất lượng (WQT) cho một user:
-  - **Điểm chuyên cần:** Tỷ lệ số ngày báo cáo / số ngày làm việc (30 ngày gần nhất)
-  - **Điểm chất lượng:** WQT trung bình từ các task đã hoàn thành có quality
-  - **Tổng điểm:** (chuyên cần × 0.4) + (chất lượng × 0.6)
-- `GET /api/scoring/ranking` – Bảng xếp hạng điểm cho tất cả user (giảm dần theo tổng điểm)
+- `GET /api/scoring/user/{userId}?month=YYYY-MM` – Tính điểm chuyên cần và chất lượng (WQT) cho một user theo tháng.
+- **`GET /api/scoring/ranking?month=YYYY-MM`** – Bảng xếp hạng theo tháng. Mỗi phần tử có **`timeWorkScore5`** (thời gian làm việc, max 5đ), **`dailyReportScore5`** (báo cáo hàng ngày, max 5đ), `totalScore`, `reportedDays`. Frontend dùng để hiển thị cột **C.Tổng** (tối đa 10đ). Nếu API chưa trả về hai trường này, C.Tổng fallback hiển thị **số ngày công**.
 
 ## WQT
 

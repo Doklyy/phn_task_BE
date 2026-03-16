@@ -35,7 +35,6 @@ public class DailyReport {
     /** Trọng số (W) người dùng nhập trong báo cáo (0..1) */
     @Column
     private Double weight;
-
     /** Mặc định = thời điểm nhấn Gửi */
     @Column(name = "submitted_at", nullable = false)
     private LocalDateTime submittedAt;
