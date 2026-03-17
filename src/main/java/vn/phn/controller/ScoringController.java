@@ -1,11 +1,17 @@
 package vn.phn.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vn.phn.dto.ScoringDto;
+import vn.phn.service.EvaluationFormExportService;
 import vn.phn.service.ScoringService;
 
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.YearMonth;
 import java.util.List;
 
@@ -16,6 +22,7 @@ import java.util.List;
 public class ScoringController {
 
     private final ScoringService scoringService;
+    private final EvaluationFormExportService evaluationFormExportService;
 
     /**
      * Tính điểm chuyên cần và chất lượng (WQT) cho một user theo tháng.
@@ -39,6 +46,28 @@ public class ScoringController {
             @RequestParam(required = false) String month) {
         YearMonth ym = parseMonth(month);
         return ResponseEntity.ok(scoringService.getRanking(ym));
+    }
+
+    /**
+     * Xuất phiếu đánh giá cá nhân theo tháng (mỗi nhân viên một sheet) dùng template PHIEU_TEMPLATE.xlsx.
+     * Ví dụ: /api/scoring/export-forms?month=2026-02
+     */
+    @GetMapping("/export-forms")
+    public void exportForms(
+            @RequestParam String month,
+            HttpServletResponse response) throws IOException {
+        YearMonth ym = parseMonth(month);
+        if (ym == null) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            return;
+        }
+        try (Workbook wb = evaluationFormExportService.buildWorkbookForMonth(ym)) {
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            String fileName = "PHIEU_DANH_GIA_" + month + ".xlsx";
+            String encoded = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
+            response.setHeader("Content-Disposition", "attachment; filename*=UTF-8''" + encoded);
+            wb.write(response.getOutputStream());
+        }
     }
 
     private YearMonth parseMonth(String month) {
