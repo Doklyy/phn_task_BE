@@ -37,13 +37,13 @@ public class EvaluationFormExportService {
     public Workbook buildWorkbookForMonth(YearMonth month) throws IOException {
         ClassPathResource resource = new ClassPathResource("templates/PHIEU_TEMPLATE.xlsx");
         try (InputStream is = resource.getInputStream()) {
-            Workbook templateWb = new XSSFWorkbook(is);
-            Sheet templateSheet = templateWb.getSheetAt(0);
-
-            Workbook wb = new XSSFWorkbook();
+            // Đọc trực tiếp file template thành một workbook
+            Workbook wb = new XSSFWorkbook(is);
+            Sheet templateSheet = wb.getSheetAt(0);
 
             List<ScoringDto> scores = scoringService.getRanking(month);
 
+            boolean first = true;
             for (ScoringDto s : scores) {
                 Long uid = s.getUserId();
                 if (uid == null) continue;
@@ -51,10 +51,22 @@ public class EvaluationFormExportService {
                 if (user == null) continue;
 
                 String sheetName = user.getName() != null ? user.getName() : "User-" + uid;
-                Sheet sheet = wb.createSheet(sheetName);
-                copySheet(templateSheet, sheet);
 
-                // DÒNG / CỘT CẦN ĐIỀN – điều chỉnh cho khớp template thực tế nếu cần
+                Sheet sheet;
+                if (first) {
+                    // Dùng luôn sheet template cho nhân viên đầu tiên
+                    sheet = templateSheet;
+                    int idx = wb.getSheetIndex(sheet);
+                    wb.setSheetName(idx, sheetName);
+                    first = false;
+                } else {
+                    // Nhân bản sheet template cho các nhân viên tiếp theo
+                    int templateIndex = wb.getSheetIndex(templateSheet);
+                    Sheet clonedIndex = wb.cloneSheet(templateIndex);  // <-- clone bằng index
+                    sheet = wb.getSheetAt(templateIndex);
+                    wb.setSheetName(templateIndex, sheetName);
+                }
+
                 // Bên nhận việc – ví dụ B11
                 Row row11 = sheet.getRow(10);
                 if (row11 != null) {
@@ -86,7 +98,6 @@ public class EvaluationFormExportService {
                 }
             }
 
-            templateWb.close();
             return wb;
         }
     }
@@ -97,49 +108,6 @@ public class EvaluationFormExportService {
             cell = row.createCell(colIdx);
         }
         return cell;
-    }
-
-    /**
-     * Sao chép đơn giản template sang sheet mới: giá trị + style + width.
-     * Không xử lý công thức phức tạp nhưng đủ dùng cho mẫu phiếu này.
-     */
-    private static void copySheet(Sheet src, Sheet dest) {
-        for (int r = 0; r <= src.getLastRowNum(); r++) {
-            Row srcRow = src.getRow(r);
-            Row destRow = dest.createRow(r);
-            if (srcRow == null) continue;
-            for (int c = 0; c < srcRow.getLastCellNum(); c++) {
-                Cell srcCell = srcRow.getCell(c);
-                Cell destCell = destRow.createCell(c);
-                if (srcCell == null) continue;
-                copyCell(srcCell, destCell);
-            }
-            destRow.setHeight(srcRow.getHeight());
-        }
-        Row firstRow = src.getRow(0);
-        if (firstRow != null) {
-            for (int c = 0; c < firstRow.getLastCellNum(); c++) {
-                dest.setColumnWidth(c, src.getColumnWidth(c));
-            }
-        }
-    }
-
-    private static void copyCell(Cell src, Cell dest) {
-        Workbook wb = dest.getSheet().getWorkbook();
-        CellStyle style = wb.createCellStyle();
-        style.cloneStyleFrom(src.getCellStyle());
-        dest.setCellStyle(style);
-
-        switch (src.getCellType()) {
-            case STRING -> dest.setCellValue(src.getStringCellValue());
-            case NUMERIC -> dest.setCellValue(src.getNumericCellValue());
-            case BOOLEAN -> dest.setCellValue(src.getBooleanCellValue());
-            case FORMULA -> {
-                dest.setCellFormula(src.getCellFormula());
-            }
-            default -> {
-            }
-        }
     }
 }
 
