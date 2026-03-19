@@ -410,4 +410,28 @@ public class TaskService {
         task = taskRepository.save(task);
         return toDto(task, approver);
     }
+
+    /**
+     * Xóa nhiệm vụ – chỉ dành cho Admin.
+     * Xóa luôn các báo cáo ngày liên quan đến task này để tránh dữ liệu mồ côi.
+     */
+    @Transactional
+    public boolean deleteTaskAsAdmin(Long taskId, Long currentUserId) {
+        User currentUser = userRepository.findById(currentUserId).orElse(null);
+        if (currentUser == null || currentUser.getRole() != Role.ADMIN) {
+            return false;
+        }
+        Task task = taskRepository.findById(taskId).orElse(null);
+        if (task == null) {
+            return false;
+        }
+        // Xóa các DailyReport liên quan
+        List<DailyReport> reports = dailyReportRepository.findByTaskIdOrderByReportDateDesc(taskId);
+        if (!reports.isEmpty()) {
+            dailyReportRepository.deleteAll(reports);
+        }
+        // Xóa task
+        taskRepository.delete(task);
+        return true;
+    }
 }

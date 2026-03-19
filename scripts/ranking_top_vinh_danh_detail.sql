@@ -34,23 +34,69 @@ attendance AS (
 task_scores AS (
   SELECT
     t.assignee_id AS user_id,
-    t.id AS task_id,
-    t.title AS task_title,
-    t.weight AS w,
-    COALESCE(t.quality, CASE WHEN t.status = 'COMPLETED' THEN 1.0 ELSE 0.0 END) AS q,
+    t.id          AS task_id,
+    t.title       AS task_title,
+
+    -- W: 1 / 2 / 3 / 5 / 8 giống file Excel (từ weight 0.2 / 0.4 / 0.6 / 0.8 / 1.0)
     CASE
-      WHEN t.completed_at IS NOT NULL THEN CASE WHEN t.completed_at <= t.deadline THEN 1.0 ELSE 0.5 END
-      ELSE CASE WHEN NOW() > t.deadline THEN 0.0 ELSE 0.5 END
+      WHEN t.weight <= 0.25 THEN 1
+      WHEN t.weight <= 0.50 THEN 2
+      WHEN t.weight <= 0.70 THEN 3
+      WHEN t.weight <= 0.90 THEN 5
+      ELSE 8
+    END AS w,
+
+    -- Q: lấy trực tiếp quality đã import (0; 0.6; 1; 1.1; 1.3...)
+    COALESCE(t.quality, 0) AS q,
+
+    -- T: 1 = Hoàn thành đúng hạn; 0.7 = Hoàn thành sau hạn; 0 = còn lại
+    CASE
+      WHEN t.status = 'COMPLETED'
+           AND t.completed_at IS NOT NULL
+           AND t.deadline     IS NOT NULL
+           AND t.completed_at <= t.deadline
+        THEN 1.0
+      WHEN t.status = 'COMPLETED'
+           AND t.completed_at IS NOT NULL
+           AND t.deadline     IS NOT NULL
+           AND t.completed_at > t.deadline
+        THEN 0.7
+      ELSE 0.0
     END AS t_factor,
-    (t.weight * COALESCE(t.quality, CASE WHEN t.status = 'COMPLETED' THEN 1.0 ELSE 0.0 END) *
-     CASE WHEN t.completed_at IS NOT NULL THEN CASE WHEN t.completed_at <= t.deadline THEN 1.0 ELSE 0.5 END ELSE CASE WHEN NOW() > t.deadline THEN 0.0 ELSE 0.5 END END) AS wqt
+
+    -- Điểm nhiệm vụ từng task = W × Q × T (đúng như cột Tổng điểm trong file Theo doi Nhiem vu)
+    (CASE
+       WHEN t.weight <= 0.25 THEN 1
+       WHEN t.weight <= 0.50 THEN 2
+       WHEN t.weight <= 0.70 THEN 3
+       WHEN t.weight <= 0.90 THEN 5
+       ELSE 8
+     END
+     * COALESCE(t.quality, 0)
+     * CASE
+         WHEN t.status = 'COMPLETED'
+              AND t.completed_at IS NOT NULL
+              AND t.deadline     IS NOT NULL
+              AND t.completed_at <= t.deadline
+           THEN 1.0
+         WHEN t.status = 'COMPLETED'
+              AND t.completed_at IS NOT NULL
+              AND t.deadline     IS NOT NULL
+              AND t.completed_at > t.deadline
+           THEN 0.7
+         ELSE 0.0
+       END
+    ) AS wqt
   FROM tasks t, params p
   WHERE t.deadline IS NOT NULL
     AND t.deadline::date BETWEEN p.start_date AND p.end_date
     AND t.weight IS NOT NULL AND t.weight > 0
 ),
 quality_agg AS (
-  SELECT user_id, SUM(w) AS total_assigned_w, SUM(wqt) AS total_achieved
+  SELECT
+    user_id,
+    SUM(w)   AS total_assigned_w,  -- Trọng số CV được giao
+    SUM(wqt) AS total_achieved     -- Điểm đạt (tổng W×Q×T)
   FROM task_scores
   GROUP BY user_id
 )

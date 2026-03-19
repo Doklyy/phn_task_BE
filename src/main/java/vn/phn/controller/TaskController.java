@@ -196,4 +196,21 @@ public class TaskController {
         headers.setContentDispositionFormData("attachment", "danh-sach-nhiem-vu.xlsx");
         return ResponseEntity.ok().headers(headers).body(bytes);
     }
+
+    /**
+     * Xóa nhiệm vụ – chỉ dành cho Admin.
+     * DELETE /api/tasks/{taskId}?userId=...
+     */
+    @DeleteMapping("/{taskId}")
+    public ResponseEntity<?> deleteTask(
+            @PathVariable Long taskId,
+            @RequestParam Long userId) {
+        boolean ok = taskService.deleteTaskAsAdmin(taskId, userId);
+        if (!ok) {
+            return ResponseEntity.status(403).body(Map.of(
+                    "message", "Chỉ Admin mới được xóa nhiệm vụ hoặc nhiệm vụ không tồn tại."
+            ));
+        }
+        return ResponseEntity.noContent().build();
+    }
 }

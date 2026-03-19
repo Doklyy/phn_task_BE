@@ -52,16 +52,16 @@ SET
     t.quality
   ),
   status = COALESCE(
-    CASE trim(lower(i.trang_thai_cv))
-      WHEN 'hoàn thành đúng hạn' THEN 'completed'
-      WHEN 'hoàn thành sau hạn'  THEN 'completed'
-      WHEN 'đang thực hiện'     THEN 'accepted'
-      WHEN 'tạm dừng'           THEN 'paused'
-      WHEN 'không hoàn thành'   THEN 'new'
-      ELSE t.status
-    END,
-    t.status
-  ),
+  CASE trim(lower(i.trang_thai_cv))
+    WHEN 'hoàn thành đúng hạn' THEN 'COMPLETED'
+    WHEN 'hoàn thành sau hạn'  THEN 'COMPLETED'
+    WHEN 'đang thực hiện'      THEN 'ACCEPTED'
+    WHEN 'tạm dừng'            THEN 'PAUSED'
+    WHEN 'không hoàn thành'    THEN 'NEW'
+    ELSE t.status
+  END,
+  t.status
+),
   -- Ngày hoàn thành: nếu CSV có thì dùng; nếu trống nhưng trạng thái là Hoàn thành thì đặt trong tháng 2 (để tính điểm tháng 2)
   completed_at = CASE
     WHEN i.ngay_hoan_thanh IS NOT NULL AND trim(i.ngay_hoan_thanh) <> ''
@@ -75,8 +75,7 @@ SET
     ELSE t.completed_at
   END
 FROM phn_task_import i
-WHERE trim(t.title) = trim(i.ten_cong_viec)
-  AND t.created_at::date = to_date(i.ngay_giao, 'DD/MM/YYYY');
+WHERE trim(t.title) = trim(i.ten_cong_viec);
 
 -- Bước 2 (tùy chọn): Cập nhật người thực hiện (Chủ trì) nếu bảng users có cột name trùng với chu_tri
 -- Chạy nếu bạn đã có bảng users với name và cần gán assignee_id theo tên Chủ trì.
