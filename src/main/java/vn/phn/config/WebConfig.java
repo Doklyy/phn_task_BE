@@ -22,8 +22,11 @@ public class WebConfig {
         ));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", config);
+        // Dùng thêm cho mọi route để tránh trường hợp preflight không khớp đúng pattern /api/**
+        source.registerCorsConfiguration("/**", config);
         return new CorsFilter(source);
     }
 }
