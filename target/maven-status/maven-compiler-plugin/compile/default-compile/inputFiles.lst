@@ -26,6 +26,7 @@ C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\config\Glo
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\dto\LoginResponse.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\dto\ReportReminderDto.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\entity\DailyReport.java
+C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\dto\TaskSoftDeleteResponseDto.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\entity\LeaveRequestStatus.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\config\DataLoader.java
 C:\Users\DELL\Desktop\Task_Management_BE\backend\src\main\java\vn\phn\dto\SubmitReportRequest.java

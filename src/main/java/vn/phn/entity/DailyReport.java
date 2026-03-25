@@ -46,7 +46,7 @@ public class DailyReport {
     private Instant createdAt;
 
     @PrePersist
-    protected void onCreate() {
+    protected void onCreate() {                    
         createdAt = Instant.now();
     }
 }

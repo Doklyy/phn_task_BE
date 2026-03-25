@@ -95,7 +95,7 @@ public class ScoringService {
         }
 
         // Tính điểm chất lượng W_Q_T từ các task trong kỳ
-        List<Task> tasksInPeriod = taskRepository.findByAssigneeIdOrderByDeadlineAsc(userId).stream()
+        List<Task> tasksInPeriod = taskRepository.findByAssigneeIdAndDeletedAtIsNullOrderByDeadlineAsc(userId).stream()
                 .filter(t -> t.getDeadline() != null)
                 .filter(t -> {
                     LocalDate d = t.getDeadline().toLocalDate();

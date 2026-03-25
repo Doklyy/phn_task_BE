@@ -72,6 +72,43 @@ public class DailyReportService {
     private static final ZoneId VIETNAM = ZoneId.of("Asia/Ho_Chi_Minh");
 
     /**
+     * Chỉ nhiệm vụ {@link TaskStatus#ACCEPTED} (đang thực hiện) mới bắt buộc báo cáo tiến độ theo ngày.
+     * <ul>
+     *   <li>{@link TaskStatus#PENDING_APPROVAL} — đã gửi hoàn thành, đợi duyệt: không bắt báo cáo tiến độ (TaskService.submitCompletion).</li>
+     *   <li>{@link TaskStatus#COMPLETED} — đã duyệt xong: không bắt.</li>
+     *   <li>{@link TaskStatus#PAUSED} — tạm dừng: không bắt.</li>
+     *   <li>{@link TaskStatus#NEW} — chưa tiếp nhận: không bắt báo cáo tiến độ; sau khi tiếp nhận ({@code acceptedAt}) mới vào diện bắt buộc.</li>
+     * </ul>
+     * Khi sếp từ chối hoàn thành, task về lại {@link TaskStatus#ACCEPTED} (TaskService.rejectCompletion) với {@code acceptedAt} mới → bắt buộc báo cáo lại từ ngày trả về.
+     */
+    private static boolean requiresDailyProgressReport(Task t) {
+        return t != null && t.getStatus() == TaskStatus.ACCEPTED;
+    }
+
+    /**
+     * Ngày đầu tiên phải báo cáo tiến độ: ngày tiếp nhận ({@link Task#getAcceptedAt()}), hoặc dữ liệu cũ chưa có thì lấy ngày tạo.
+     */
+    private static LocalDate firstDailyReportObligationDay(Task t, ZoneId zone) {
+        if (t == null) return null;
+        if (t.getAcceptedAt() != null) {
+            return t.getAcceptedAt().atZone(zone).toLocalDate();
+        }
+        if (t.getCreatedAt() != null) {
+            return t.getCreatedAt().atZone(zone).toLocalDate();
+        }
+        return null;
+    }
+
+    /**
+     * Vào ngày {@code day}, nhiệm vụ đã bắt đầu nghĩa vụ báo cáo tiến độ (đã tiếp nhận vào hoặc trước ngày đó).
+     */
+    private static boolean obligationAppliesOnOrBefore(Task t, LocalDate day, ZoneId zone) {
+        LocalDate start = firstDailyReportObligationDay(t, zone);
+        if (start == null) return false;
+        return !start.isAfter(day);
+    }
+
+    /**
      * Kiểm tra nhắc báo cáo: nếu ngày hôm trước (theo giờ VN) user có công việc mà chưa báo cáo thì yêu cầu báo cáo bù.
      * Quy định: đến 24:00 chưa báo cáo thì coi là chưa hoàn thành; sáng hôm sau hệ thống nhắc báo cáo bù.
      */
@@ -79,18 +116,13 @@ public class DailyReportService {
         LocalDate today = LocalDate.now(VIETNAM);
         LocalDate yesterday = today.minusDays(1);
 
-        List<Task> assigneeTasks = taskRepository.findByAssigneeIdOrderByDeadlineAsc(userId).stream()
-                .filter(t -> t.getStatus() == TaskStatus.ACCEPTED || t.getStatus() == TaskStatus.NEW)
+        List<Task> assigneeTasks = taskRepository.findByAssigneeIdAndDeletedAtIsNullOrderByDeadlineAsc(userId).stream()
+                .filter(DailyReportService::requiresDailyProgressReport)
                 .collect(Collectors.toList());
 
-        // Có công việc hôm qua = có ít nhất một task tồn tại trong ngày hôm qua (kể cả đã hoàn thành trong ngày hôm qua).
-        boolean hadWorkYesterday = assigneeTasks.stream().anyMatch(t -> {
-            LocalDate taskCreated = t.getCreatedAt() != null ? t.getCreatedAt().atZone(VIETNAM).toLocalDate() : null;
-            if (taskCreated == null || taskCreated.isAfter(yesterday)) return false;
-            if (t.getCompletedAt() == null) return true;
-            // Hoàn thành trong hoặc sau ngày hôm qua => vẫn coi là có việc hôm qua (phải báo cáo).
-            return !t.getCompletedAt().toLocalDate().isBefore(yesterday);
-        });
+        // Có việc phải báo cáo hôm qua = ít nhất một task ACCEPTED đã tiếp nhận (acceptedAt) vào hoặc trước hôm qua.
+        boolean hadWorkYesterday = assigneeTasks.stream()
+                .anyMatch(t -> obligationAppliesOnOrBefore(t, yesterday, VIETNAM));
 
         if (!hadWorkYesterday) {
             return ReportReminderDto.builder()
@@ -113,14 +145,9 @@ public class DailyReportService {
                     .build();
         }
 
-        // Danh sách nhiệm vụ có công việc hôm qua (chưa báo cáo) — hiển thị trên màn hình chặn
+        // Danh sách nhiệm vụ (chỉ ACCEPTED) để hiển thị trên màn hình chặn
         List<ReportReminderDto.MissingTaskItem> missingTaskItems = assigneeTasks.stream()
-                .filter(t -> {
-                    LocalDate taskCreated = t.getCreatedAt() != null ? t.getCreatedAt().atZone(VIETNAM).toLocalDate() : null;
-                    if (taskCreated == null || taskCreated.isAfter(yesterday)) return false;
-                    if (t.getCompletedAt() == null) return true;
-                    return !t.getCompletedAt().toLocalDate().isBefore(yesterday);
-                })
+                .filter(t -> obligationAppliesOnOrBefore(t, yesterday, VIETNAM))
                 .map(t -> ReportReminderDto.MissingTaskItem.builder()
                         .taskId(t.getId())
                         .taskTitle(t.getTitle() != null ? t.getTitle() : "Nhiệm vụ #" + t.getId())
@@ -166,7 +193,7 @@ public class DailyReportService {
                     .map(DailyReport::getReportDate)
                     .collect(Collectors.toSet());
 
-            List<Task> assigneeTasks = taskRepository.findByAssigneeIdOrderByDeadlineAsc(userId).stream()
+            List<Task> assigneeTasks = taskRepository.findByAssigneeIdAndDeletedAtIsNullOrderByDeadlineAsc(userId).stream()
                     .filter(t -> t.getStatus() == TaskStatus.ACCEPTED)
                     .collect(Collectors.toList());
 
@@ -174,12 +201,8 @@ public class DailyReportService {
             int missedDays = 0;
             for (LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
                 final LocalDate day = d;
-                boolean hadBacklog = assigneeTasks.stream().anyMatch(t -> {
-                    LocalDate taskCreated = t.getCreatedAt() != null ? t.getCreatedAt().atZone(VIETNAM).toLocalDate() : null;
-                    if (taskCreated == null || taskCreated.isAfter(day)) return false;
-                    if (t.getCompletedAt() == null) return true;
-                    return !t.getCompletedAt().toLocalDate().isBefore(day);
-                });
+                boolean hadBacklog = assigneeTasks.stream()
+                        .anyMatch(t -> obligationAppliesOnOrBefore(t, day, VIETNAM));
                 if (!hadBacklog) continue;
                 requiredDays++;
                 if (!reportedDates.contains(day)) missedDays++;

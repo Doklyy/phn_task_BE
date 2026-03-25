@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.phn.dto.TaskDto;
+import vn.phn.dto.TaskSoftDeleteResponseDto;
 import vn.phn.dto.CreateTaskRequest;
 import vn.phn.dto.UpdateTaskRequest;
 import vn.phn.entity.Role;
@@ -17,6 +18,7 @@ import vn.phn.repository.DailyReportRepository;
 
 import java.util.Objects;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -31,6 +33,13 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
     private final DailyReportRepository dailyReportRepository;
+
+    /** Task còn hiển thị / thao tác (chưa xóa mềm). */
+    private Task requireActiveTask(Long taskId) {
+        return taskRepository.findById(taskId)
+                .filter(t -> t.getDeletedAt() == null)
+                .orElse(null);
+    }
 
     /**
      * Công thức WQT: WQT = weight * quality (chất lượng 0..1 do Leader đánh giá).
@@ -53,11 +62,11 @@ public class TaskService {
 
         List<Task> tasks;
         if (role == Role.ADMIN) {
-            tasks = taskRepository.findAll();
+            tasks = taskRepository.findAllByDeletedAtIsNull();
         } else if (role == Role.LEADER) {
-            tasks = taskRepository.findByLeaderIdOrAssigneeIdOrderByDeadlineAsc(currentUserId, currentUserId);
+            tasks = taskRepository.findByLeaderIdOrAssigneeIdAndDeletedAtIsNullOrderByDeadlineAsc(currentUserId, currentUserId);
         } else {
-            tasks = taskRepository.findByAssigneeIdOrderByDeadlineAsc(currentUserId);
+            tasks = taskRepository.findByAssigneeIdAndDeletedAtIsNullOrderByDeadlineAsc(currentUserId);
         }
 
         // Sắp xếp: NEW/ACCEPTED lên trên, COMPLETED xuống dưới, sau đó theo deadline
@@ -84,11 +93,11 @@ public class TaskService {
 
         List<Task> tasks;
         if (role == Role.ADMIN) {
-            tasks = taskRepository.findAll();
+            tasks = taskRepository.findAllByDeletedAtIsNull();
         } else if (role == Role.LEADER) {
-            tasks = taskRepository.findByLeaderIdOrAssigneeIdOrderByDeadlineAsc(currentUserId, currentUserId);
+            tasks = taskRepository.findByLeaderIdOrAssigneeIdAndDeletedAtIsNullOrderByDeadlineAsc(currentUserId, currentUserId);
         } else {
-            tasks = taskRepository.findByAssigneeIdOrderByDeadlineAsc(currentUserId);
+            tasks = taskRepository.findByAssigneeIdAndDeletedAtIsNullOrderByDeadlineAsc(currentUserId);
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -110,12 +119,12 @@ public class TaskService {
 
         List<Task> tasks;
         if (role == Role.ADMIN) {
-            tasks = taskRepository.findByDeadlineBetweenOrderByDeadlineAsc(start, end);
+            tasks = taskRepository.findByDeadlineBetweenAndDeletedAtIsNullOrderByDeadlineAsc(start, end);
         } else if (role == Role.LEADER) {
-            List<Task> all = taskRepository.findByLeaderIdOrAssigneeIdOrderByDeadlineAsc(currentUserId, currentUserId);
+            List<Task> all = taskRepository.findByLeaderIdOrAssigneeIdAndDeletedAtIsNullOrderByDeadlineAsc(currentUserId, currentUserId);
             tasks = all.stream().filter(t -> !t.getDeadline().isBefore(start) && !t.getDeadline().isAfter(end)).collect(Collectors.toList());
         } else {
-            tasks = taskRepository.findByAssigneeIdAndDeadlineBetweenOrderByDeadlineAsc(currentUserId, start, end);
+            tasks = taskRepository.findByAssigneeIdAndDeadlineBetweenAndDeletedAtIsNullOrderByDeadlineAsc(currentUserId, start, end);
         }
         // Sắp xếp: NEW/ACCEPTED lên trên, COMPLETED xuống dưới
         tasks.sort((t1, t2) -> {
@@ -153,12 +162,12 @@ public class TaskService {
     private List<TaskDto> filterByDateRange(Long currentUserId, Role role, LocalDateTime start, LocalDateTime end) {
         List<Task> tasks;
         if (role == Role.ADMIN) {
-            tasks = taskRepository.findByDeadlineBetweenOrderByDeadlineAsc(start, end);
+            tasks = taskRepository.findByDeadlineBetweenAndDeletedAtIsNullOrderByDeadlineAsc(start, end);
         } else if (role == Role.LEADER) {
-            List<Task> all = taskRepository.findByLeaderIdOrAssigneeIdOrderByDeadlineAsc(currentUserId, currentUserId);
+            List<Task> all = taskRepository.findByLeaderIdOrAssigneeIdAndDeletedAtIsNullOrderByDeadlineAsc(currentUserId, currentUserId);
             tasks = all.stream().filter(t -> !t.getDeadline().isBefore(start) && !t.getDeadline().isAfter(end)).collect(Collectors.toList());
         } else {
-            tasks = taskRepository.findByAssigneeIdAndDeadlineBetweenOrderByDeadlineAsc(currentUserId, start, end);
+            tasks = taskRepository.findByAssigneeIdAndDeadlineBetweenAndDeletedAtIsNullOrderByDeadlineAsc(currentUserId, start, end);
         }
 
         // Sắp xếp: NEW/ACCEPTED lên trên, COMPLETED xuống dưới
@@ -195,10 +204,11 @@ public class TaskService {
     /** Tiếp nhận task: chuyển NEW -> ACCEPTED */
     @Transactional
     public TaskDto acceptTask(Long taskId, Long userId) {
-        Task task = taskRepository.findById(taskId).orElse(null);
+        Task task = requireActiveTask(taskId);
         if (task == null || !task.getAssigneeId().equals(userId) || task.getStatus() != TaskStatus.NEW)
             return null;
         task.setStatus(TaskStatus.ACCEPTED);
+        task.setAcceptedAt(LocalDateTime.now());
         task = taskRepository.save(task);
         return toDto(task, userRepository.findById(userId).orElse(null));
     }
@@ -206,14 +216,17 @@ public class TaskService {
     /** Cập nhật trạng thái (Leader/Admin có thể đánh giá quality, đánh dấu hoàn thành) */
     @Transactional
     public TaskDto updateTask(Long taskId, TaskStatus status, Double quality, Long currentUserId, Role role) {
-        Task task = taskRepository.findById(taskId).orElse(null);
+        Task task = requireActiveTask(taskId);
         if (task == null) return null;
         if (role != Role.ADMIN && role != Role.LEADER) return null;
+        TaskStatus prev = task.getStatus();
         if (quality != null) task.setQuality(quality);
         if (status != null) {
             task.setStatus(status);
             if (status == TaskStatus.COMPLETED)
                 task.setCompletedAt(LocalDateTime.now());
+            if (status == TaskStatus.ACCEPTED && prev != TaskStatus.ACCEPTED)
+                task.setAcceptedAt(LocalDateTime.now());
         }
         task = taskRepository.save(task);
         return toDto(task, userRepository.findById(currentUserId).orElse(null));
@@ -226,7 +239,7 @@ public class TaskService {
     @Transactional
     public TaskDto updateTaskDetails(Long taskId, UpdateTaskRequest req, Long currentUserId, Role role) {
         if (req == null) return null;
-        Task task = taskRepository.findById(taskId).orElse(null);
+        Task task = requireActiveTask(taskId);
         if (task == null) return null;
         if (role != Role.ADMIN && role != Role.LEADER) return null;
         if (role == Role.LEADER && !Objects.equals(task.getLeaderId(), currentUserId))
@@ -245,10 +258,13 @@ public class TaskService {
         if (req.getQuality() != null)
             task.setQuality(req.getQuality());
         if (req.getStatus() != null && !req.getStatus().isBlank()) {
+            TaskStatus prev = task.getStatus();
             TaskStatus s = TaskStatus.valueOf(req.getStatus().toUpperCase().trim());
             task.setStatus(s);
             if (s == TaskStatus.COMPLETED)
                 task.setCompletedAt(LocalDateTime.now());
+            if (s == TaskStatus.ACCEPTED && prev != TaskStatus.ACCEPTED)
+                task.setAcceptedAt(LocalDateTime.now());
         }
 
         task = taskRepository.save(task);
@@ -292,12 +308,14 @@ public class TaskService {
                 .assigneeName(assigneeName)
                 .attachmentPath(t.getAttachmentPath())
                 .createdAt(t.getCreatedAt() != null ? t.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toLocalDateTime() : null)
+                .acceptedAt(t.getAcceptedAt())
                 .completedAt(t.getCompletedAt())
                 .completionNote(t.getCompletionNote())
                 .completionLink(t.getCompletionLink())
                 .completionFilePath(t.getCompletionFilePath())
                 .lastRejectReason(t.getLastRejectReason())
                 .lastRejectAt(t.getLastRejectAt())
+                .deletedAt(t.getDeletedAt())
                 .build();
     }
 
@@ -306,7 +324,7 @@ public class TaskService {
      */
     @Transactional
     public TaskDto submitCompletion(Long taskId, Long userId, String note, String link, String filePath) {
-        Task task = taskRepository.findById(taskId).orElse(null);
+        Task task = requireActiveTask(taskId);
         if (task == null) return null;
         if (!Objects.equals(task.getAssigneeId(), userId)) return null;
         if (task.getStatus() != TaskStatus.ACCEPTED) return null;
@@ -347,7 +365,7 @@ public class TaskService {
      */
     @Transactional
     public TaskDto approveCompletion(Long taskId, Long approverId, Double quality) {
-        Task task = taskRepository.findById(taskId).orElse(null);
+        Task task = requireActiveTask(taskId);
         if (task == null) return null;
         User approver = userRepository.findById(approverId).orElse(null);
         if (approver == null || (approver.getRole() != Role.LEADER && approver.getRole() != Role.ADMIN)) {
@@ -379,7 +397,7 @@ public class TaskService {
      */
     @Transactional
     public TaskDto rejectCompletion(Long taskId, Long approverId, String reason) {
-        Task task = taskRepository.findById(taskId).orElse(null);
+        Task task = requireActiveTask(taskId);
         if (task == null) return null;
         User approver = userRepository.findById(approverId).orElse(null);
         if (approver == null || (approver.getRole() != Role.LEADER && approver.getRole() != Role.ADMIN)) {
@@ -400,6 +418,7 @@ public class TaskService {
         // Admin được từ chối tất cả task
         if (task.getStatus() != TaskStatus.PENDING_APPROVAL) return null;
         task.setStatus(TaskStatus.ACCEPTED);
+        task.setAcceptedAt(LocalDateTime.now());
         task.setCompletionNote(null);
         task.setCompletionLink(null);
         task.setCompletionFilePath(null);
@@ -412,26 +431,53 @@ public class TaskService {
     }
 
     /**
-     * Xóa nhiệm vụ – chỉ dành cho Admin.
-     * Xóa luôn các báo cáo ngày liên quan đến task này để tránh dữ liệu mồ côi.
+     * Xóa mềm nhiệm vụ (admin): ẩn khỏi danh sách, giữ nguyên báo cáo tiến độ (daily_reports).
+     * Hoàn tác: {@link #restoreTaskAsAdmin(Long, Long)}.
      */
     @Transactional
-    public boolean deleteTaskAsAdmin(Long taskId, Long currentUserId) {
+    public TaskSoftDeleteResponseDto softDeleteTaskAsAdmin(Long taskId, Long currentUserId) {
         User currentUser = userRepository.findById(currentUserId).orElse(null);
         if (currentUser == null || currentUser.getRole() != Role.ADMIN) {
-            return false;
+            return null;
+        }
+        Task task = requireActiveTask(taskId);
+        if (task == null) {
+            return null;
+        }
+        task.setDeletedAt(Instant.now());
+        taskRepository.save(task);
+        return TaskSoftDeleteResponseDto.builder()
+                .taskId(taskId)
+                .message("Đã xóa. Gọi POST /api/tasks/" + taskId + "/restore?userId=... (Admin) để hoàn tác; báo cáo tiến độ được giữ nguyên.")
+                .build();
+    }
+
+    /**
+     * Hoàn tác xóa mềm: khôi phục nhiệm vụ và mọi báo cáo ngày (không đổi task_id).
+     */
+    @Transactional
+    public TaskDto restoreTaskAsAdmin(Long taskId, Long currentUserId) {
+        User currentUser = userRepository.findById(currentUserId).orElse(null);
+        if (currentUser == null || currentUser.getRole() != Role.ADMIN) {
+            return null;
         }
         Task task = taskRepository.findById(taskId).orElse(null);
-        if (task == null) {
-            return false;
+        if (task == null || task.getDeletedAt() == null) {
+            return null;
         }
-        // Xóa các DailyReport liên quan
-        List<DailyReport> reports = dailyReportRepository.findByTaskIdOrderByReportDateDesc(taskId);
-        if (!reports.isEmpty()) {
-            dailyReportRepository.deleteAll(reports);
+        task.setDeletedAt(null);
+        task = taskRepository.save(task);
+        return toDto(task, currentUser);
+    }
+
+    /** Danh sách nhiệm vụ đã xóa mềm (thùng rác), mới xóa trước — chỉ Admin. */
+    public List<TaskDto> listSoftDeletedTasksForAdmin(Long currentUserId) {
+        User currentUser = userRepository.findById(currentUserId).orElse(null);
+        if (currentUser == null || currentUser.getRole() != Role.ADMIN) {
+            return List.of();
         }
-        // Xóa task
-        taskRepository.delete(task);
-        return true;
+        return taskRepository.findAllByDeletedAtIsNotNullOrderByDeletedAtDesc().stream()
+                .map(t -> toDto(t, currentUser))
+                .collect(Collectors.toList());
     }
 }

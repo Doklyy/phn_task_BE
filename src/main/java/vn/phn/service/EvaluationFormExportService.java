@@ -76,7 +76,7 @@ public class EvaluationFormExportService {
                     cell.setCellValue("Bên nhận việc: Đ/c " + fullName + " - " + username);
                 }
 
-                // Tổng điểm – ví dụ H15
+                // Tổng điểm
                 Row row15 = sheet.getRow(14);
                 if (row15 != null && s.getTotalScore() != null) {
                     Cell cell = getOrCreateCell(row15, 7);

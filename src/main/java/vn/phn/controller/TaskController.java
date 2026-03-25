@@ -10,6 +10,7 @@ import vn.phn.dto.TaskDto;
 import vn.phn.dto.CreateTaskRequest;
 import vn.phn.dto.UpdateTaskRequest;
 import vn.phn.dto.CompletionReportRequest;
+import vn.phn.dto.TaskSoftDeleteResponseDto;
 import vn.phn.entity.Role;
 import vn.phn.entity.User;
 import vn.phn.service.ExcelExportService;
@@ -198,19 +199,47 @@ public class TaskController {
     }
 
     /**
-     * Xóa nhiệm vụ – chỉ dành cho Admin.
+     * Xóa mềm nhiệm vụ (ẩn + thùng rác) — chỉ Admin. Báo cáo tiến độ giữ nguyên; hoàn tác: POST .../restore.
      * DELETE /api/tasks/{taskId}?userId=...
      */
     @DeleteMapping("/{taskId}")
-    public ResponseEntity<?> deleteTask(
+    public ResponseEntity<?> softDeleteTask(
             @PathVariable Long taskId,
             @RequestParam Long userId) {
-        boolean ok = taskService.deleteTaskAsAdmin(taskId, userId);
-        if (!ok) {
+        TaskSoftDeleteResponseDto dto = taskService.softDeleteTaskAsAdmin(taskId, userId);
+        if (dto == null) {
             return ResponseEntity.status(403).body(Map.of(
-                    "message", "Chỉ Admin mới được xóa nhiệm vụ hoặc nhiệm vụ không tồn tại."
+                    "message", "Chỉ Admin mới được xóa; nhiệm vụ không tồn tại hoặc đã xóa trước đó."
             ));
         }
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(dto);
+    }
+
+    /**
+     * Hoàn tác xóa mềm — chỉ Admin. Khôi phục đầy đủ nhiệm vụ và báo cáo tiến độ.
+     * POST /api/tasks/{taskId}/restore?userId=...
+     */
+    @PostMapping("/{taskId}/restore")
+    public ResponseEntity<?> restoreTask(@PathVariable Long taskId, @RequestParam Long userId) {
+        TaskDto restored = taskService.restoreTaskAsAdmin(taskId, userId);
+        if (restored == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Chỉ Admin mới được hoàn tác; nhiệm vụ không tồn tại hoặc không ở trạng thái đã xóa mềm."
+            ));
+        }
+        return ResponseEntity.ok(restored);
+    }
+
+    /**
+     * Thùng rác: nhiệm vụ đã xóa mềm — chỉ Admin.
+     * GET /api/tasks/deleted?userId=...
+     */
+    @GetMapping("/deleted")
+    public ResponseEntity<List<TaskDto>> listSoftDeleted(@RequestParam Long userId) {
+        User user = userService.getEntity(userId);
+        if (user == null || user.getRole() != Role.ADMIN) {
+            return ResponseEntity.status(403).build();
+        }
+        return ResponseEntity.ok(taskService.listSoftDeletedTasksForAdmin(userId));
     }
 }

@@ -3,6 +3,7 @@ package vn.phn.dto;
 import lombok.*;
 import vn.phn.entity.TaskStatus;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Getter
@@ -27,6 +28,8 @@ public class TaskDto {
     private String assigneeName;
     private String attachmentPath;
     private LocalDateTime createdAt;
+    /** Thời điểm tiếp nhận nhiệm vụ (bắt đầu bắt buộc báo cáo tiến độ). */
+    private LocalDateTime acceptedAt;
     private LocalDateTime completedAt;
     /** Báo cáo hoàn thành (khi status = PENDING_APPROVAL) */
     private String completionNote;
@@ -35,4 +38,6 @@ public class TaskDto {
     /** Lịch sử trả về: lý do và thời điểm lần trả về gần nhất */
     private String lastRejectReason;
     private LocalDateTime lastRejectAt;
+    /** Khác null = đã xóa mềm, có thể gọi API restore */
+    private Instant deletedAt;
 }

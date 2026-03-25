@@ -75,6 +75,13 @@ public class Task {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    /**
+     * Thời điểm nhân viên tiếp nhận (NEW → ACCEPTED), hoặc cập nhật khi sếp trả về tồn đọng (→ ACCEPTED).
+     * Dùng làm mốc bắt đầu bắt buộc báo cáo tiến độ theo ngày — không dùng {@code createdAt} khi task còn NEW.
+     */
+    @Column(name = "accepted_at")
+    private LocalDateTime acceptedAt;
+
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
@@ -84,6 +91,10 @@ public class Task {
 
     @Column(name = "last_reject_at")
     private LocalDateTime lastRejectAt;
+
+    /** Xóa mềm (admin): có giá trị thì task ẩn khỏi danh sách thường; hoàn tác = đặt lại null. */
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
 
     @PrePersist
     protected void onCreate() {
