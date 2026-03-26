@@ -42,6 +42,22 @@ public class TaskService {
     }
 
     /**
+     * Quy tắc nghiệp vụ:
+     * - Leader được theo dõi / chỉnh sửa task của thành viên trong team mình quản lý.
+     * - Leader KHÔNG được chỉnh sửa task của chính mình (assigneeId == leaderId) — chỉ Admin được phép.
+     */
+    private boolean leaderCanEditTask(Long leaderId, Task task) {
+        if (leaderId == null || task == null) return false;
+        if (!Objects.equals(task.getLeaderId(), leaderId)) return false;
+        if (Objects.equals(task.getAssigneeId(), leaderId)) return false;
+        User leader = userRepository.findById(leaderId).orElse(null);
+        if (leader == null || leader.getTeam() == null) return false;
+        User assignee = userRepository.findById(task.getAssigneeId()).orElse(null);
+        if (assignee == null || assignee.getTeam() == null) return false;
+        return leader.getTeam().equals(assignee.getTeam());
+    }
+
+    /**
      * Công thức WQT: WQT = weight * quality (chất lượng 0..1 do Leader đánh giá).
      */
     public static double calculateWqt(Double weight, Double quality) {
@@ -219,6 +235,7 @@ public class TaskService {
         Task task = requireActiveTask(taskId);
         if (task == null) return null;
         if (role != Role.ADMIN && role != Role.LEADER) return null;
+        if (role == Role.LEADER && !leaderCanEditTask(currentUserId, task)) return null;
         TaskStatus prev = task.getStatus();
         if (quality != null) task.setQuality(quality);
         if (status != null) {
@@ -242,8 +259,7 @@ public class TaskService {
         Task task = requireActiveTask(taskId);
         if (task == null) return null;
         if (role != Role.ADMIN && role != Role.LEADER) return null;
-        if (role == Role.LEADER && !Objects.equals(task.getLeaderId(), currentUserId))
-            return null;
+        if (role == Role.LEADER && !leaderCanEditTask(currentUserId, task)) return null;
 
         if (req.getTitle() != null && !req.getTitle().isBlank())
             task.setTitle(req.getTitle().trim());
