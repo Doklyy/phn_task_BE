@@ -3,6 +3,7 @@ package vn.phn.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import vn.phn.dto.ScoringDto;
+import vn.phn.entity.Role;
 import vn.phn.entity.Task;
 import vn.phn.entity.TaskStatus;
 import vn.phn.entity.User;
@@ -201,6 +202,7 @@ public class ScoringService {
      */
     public List<ScoringDto> getRanking(YearMonth month) {
         return userRepository.findAll().stream()
+                .filter(u -> u.getRole() != Role.ADMIN)
                 .map(u -> calculateScore(u.getId(), month))
                 .filter(s -> s != null)
                 .sorted((s1, s2) -> Double.compare(s2.getTotalScore(), s1.getTotalScore())) // Giảm dần
